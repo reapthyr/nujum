@@ -18,7 +18,21 @@ export async function requireRecentReauth(): Promise<void> {
   if (!stored || stored.userId !== session.user.id || stored.expires.getTime() < Date.now()) {
     throw new SecurityError("Your session expired. Please sign in again.", "REAUTH");
   }
-  assertReauthenticated(stored.reauthenticatedAt);
+
+  // OAuth re-authentication can create a brand-new session row while the browser
+  // keeps its existing cookie (Auth.js reuses the current session when the same
+  // Discord account signs in again). In that case the newest session carries the
+  // proof of re-authentication, so treat it as authoritative for this user.
+  const newest = await getPrisma().session.findFirst({
+    where: { userId: stored.userId },
+    orderBy: { reauthenticatedAt: "desc" },
+    select: { reauthenticatedAt: true },
+  });
+  const proof =
+    newest && newest.reauthenticatedAt > stored.reauthenticatedAt
+      ? newest.reauthenticatedAt
+      : stored.reauthenticatedAt;
+  assertReauthenticated(proof);
 }
 
 /** Every destructive or security-sensitive server action calls this first. */

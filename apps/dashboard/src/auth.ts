@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import type { Adapter, AdapterUser } from "next-auth/adapters";
 import Discord from "next-auth/providers/discord";
+import { cache } from "react";
 import { getPrisma } from "@nujum/shared/prisma";
 import { getEnv } from "./env";
 
@@ -59,8 +60,11 @@ export function createAuthConfig(): NextAuthConfig {
             where: { userId: user.id },
             data: { reauthenticatedAt: new Date() },
           });
-        } catch {
-          // Session creation still succeeds; the 15-minute guard simply stays active.
+        } catch (error) {
+          // Session creation still succeeds, but log the failure so the
+          // 15-minute guard can be diagnosed instead of silently failing.
+          // eslint-disable-next-line no-console
+          console.error("Failed to refresh reauthenticatedAt on sign-in:", error);
         }
       },
     },
@@ -117,4 +121,9 @@ export function createAuthConfig(): NextAuthConfig {
 }
 
 const config = createAuthConfig();
-export const { handlers, auth, signIn, signOut } = NextAuth(config);
+const { handlers, auth: nextAuth, signIn, signOut } = NextAuth(config);
+
+// Layouts and pages render in parallel; without this every segment performs its
+// own session lookup and session-callback database query.
+export const auth = cache(nextAuth);
+export { handlers, signIn, signOut };
