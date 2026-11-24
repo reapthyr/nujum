@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { BRAND } from "@nujum/shared";
 import { baseEmbed } from "../lib/embeds";
 import { serializeError } from "../lib/errors";
+import { ensureGuildRow } from "../lib/guilds";
 import { defineEvent } from "./types";
 
 export const event = defineEvent({
@@ -16,6 +17,9 @@ export const event = defineEvent({
       },
       "joined guild",
     );
+
+    // Security and verification tables reference the guild row.
+    await ensureGuildRow(guild, client.logger);
 
     const me = guild.members.me;
     const channel = guild.systemChannel;

@@ -13,7 +13,8 @@ PostgreSQL database and one contracts package:
 
 > **Status:** Phase 1 (workspace, shared package, database schema, first migration, 78 tests) and
 > Phase 2 (bot foundation: client, commands, handlers, internal HMAC API, Docker/Caddy, 54 tests)
-> are complete. The dashboard arrives in Phase 5.
+> and Phase 3 (bot security layer: anti-raid/nuke/spam, escalation response, lockdown and
+> verification) are complete. The dashboard arrives in Phase 5.
 
 ---
 
@@ -243,7 +244,7 @@ See [SECURITY.md](SECURITY.md) for the full model and phase-by-phase controls.
 | ----- | --------------------------------------------------------------- | ----------- |
 | 1     | Monorepo, shared package, Prisma schema, migration, tests       | ✅ complete |
 | 2     | Bot foundation: client, handlers, commands, Docker              | ✅ complete |
-| 3     | Bot security layer: permissions, hierarchy, anti-raid/nuke/spam | next        |
+| 3     | Bot security layer: permissions, hierarchy, anti-raid/nuke/spam | ✅ complete |
 | 4     | Bot API + HMAC + dashboard client                               |             |
 | 5     | Dashboard auth, layout, landing                                 |             |
 | 6–13  | Tickets, JTC, help, moderation, logging, welcome, pages, extras |             |

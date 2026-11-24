@@ -1,10 +1,16 @@
 import type { NujumClient } from "../../../client/NujumClient";
 import { helpRefreshButton } from "./help";
+import { securityUnlockButton } from "./security";
+import { verificationCodeModal, verificationStartButton } from "./verification";
 import type { ButtonRoute, ModalRoute, SelectRoute } from "../types";
 
-export const buttonRoutes: readonly ButtonRoute[] = [helpRefreshButton];
+export const buttonRoutes: readonly ButtonRoute[] = [
+  helpRefreshButton,
+  securityUnlockButton,
+  verificationStartButton,
+];
 export const selectRoutes: readonly SelectRoute[] = [];
-export const modalRoutes: readonly ModalRoute[] = [];
+export const modalRoutes: readonly ModalRoute[] = [verificationCodeModal];
 
 export function registerInteractionRoutes(client: NujumClient): void {
   for (const route of buttonRoutes) {
@@ -29,6 +35,6 @@ export function registerInteractionRoutes(client: NujumClient): void {
       selects: client.selectRoutes.size,
       modals: client.modalRoutes.size,
     },
-    "interaction routes registered",
+    "interaction routes loaded",
   );
 }

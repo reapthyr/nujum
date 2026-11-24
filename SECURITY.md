@@ -72,18 +72,28 @@ cooldowns/rate limits, loader safety, permission mapping, command-manifest parit
 
 ---
 
-## Planned controls by phase
+## Controls by phase
 
-### Phase 3 — bot security layer
+### Phase 3 — bot security layer (implemented)
 
-- Re-check command permissions in code (never rely on Discord's UI defaults).
-- Role hierarchy: cannot target the owner, self, the bot, or equal/higher roles.
-- Anti-raid: mass-join detection, account-age gate, auto-lockdown.
-- Anti-nuke: mass channel/role deletion, bans/kicks, webhook creation; revert where possible,
-  strip permissions, alert owner, trusted-user allowlist.
-- Permission-escalation alerts when `@everyone` or a role gains `Administrator`.
-- Scam/phishing domain list; invite/link/mention/spam/flood filters with configurable punishments.
-- Namespaced component IDs with guild/user/ticket binding and permission re-checks.
+- Re-check command permissions and role hierarchy in code; never rely on Discord's UI defaults,
+  never target the owner, self, the bot or equal/higher roles.
+- Anti-raid: mass-join detection with account-age signal, configurable punishment or auto-lockdown
+  that stores and restores previous channel overwrites.
+- Anti-nuke: audit-log-attributed channel/role deletion, bans/kicks and webhook creation; dangerous
+  roles stripped or actor banned, owner alerted, trusted-user allowlist honored, staff not exempt.
+- Permission-escalation alerts when a role gains `Administrator`, with containment of clear
+  self-escalation by a non-owner.
+- Scam/phishing domain and typosquat detection; invite/link/mention/spam/flood filters with
+  configurable punishments and per-guild alert throttling.
+- Verification codes are DM-only, hashed with a salt, timing-safe, owner-bound on submission, and
+  limited to three attempts with a ten-minute expiry.
+- Namespaced component IDs with guild/user binding and permission re-checks.
+- Cached, zod-validated configuration with safe defaults when PostgreSQL is unavailable; every
+  change written to `AuditLog`, every threat to `ThreatEvent`.
+- 82 bot tests cover detectors, configuration caching/failover, thresholds, exemptions, code
+  hashing, alert throttling, lockdown restore/retry and command-manifest parity. See
+  [docs/security.md](docs/security.md).
 
 ### Phase 4 — Bot API
 

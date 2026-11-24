@@ -4,6 +4,14 @@ import type { BotLogger } from "../lib/logger";
 import { CooldownStore, CommandRateLimiter } from "../lib/cooldowns";
 import type { Command } from "../commands/types";
 import type { ButtonRoute, ModalRoute, SelectRoute } from "../handlers/interactions/types";
+import { PrismaSecurityRepository } from "../security/repository";
+import { GuildSecurityService } from "../security/service";
+import { RaidDetector } from "../security/raid";
+import { SpamDetector } from "../security/spam";
+import { NukeDetector } from "../security/nuke";
+import { SecurityThrottle } from "../security/throttle";
+import { VerificationService } from "../security/verification/service";
+import { ModuleService } from "../lib/modules";
 
 /**
  * Intents are deliberately minimal and documented in docs/bot.md.
@@ -58,6 +66,13 @@ export class NujumClient extends Client {
   readonly modalRoutes = new Collection<string, ModalRoute>();
   readonly cooldowns = new CooldownStore();
   readonly rateLimiter = new CommandRateLimiter();
+  readonly security: GuildSecurityService;
+  readonly verification: VerificationService;
+  readonly modules: ModuleService;
+  readonly raidDetector = new RaidDetector();
+  readonly spamDetector = new SpamDetector();
+  readonly nukeDetector = new NukeDetector();
+  readonly securityThrottle = new SecurityThrottle();
   readonly owners: ReadonlySet<string>;
   readonly startedAt = Date.now();
 
@@ -66,6 +81,9 @@ export class NujumClient extends Client {
     this.env = env;
     this.logger = logger;
     this.owners = new Set(env.OWNER_IDS);
+    this.security = new GuildSecurityService(new PrismaSecurityRepository(), logger);
+    this.verification = new VerificationService(logger);
+    this.modules = new ModuleService(logger);
   }
 
   get uptimeSeconds(): number {

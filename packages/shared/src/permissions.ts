@@ -458,7 +458,16 @@ export const COMMANDS: readonly CommandDefinition[] = [
     category: "configuration",
     scope: "guild",
     userPermissions: ["ManageGuild"],
-    botPermissions: BASE_BOT,
+    // Live responses need these; Administrator is deliberately never requested.
+    botPermissions: [
+      ...BASE_BOT,
+      "ManageChannels",
+      "ManageRoles",
+      "BanMembers",
+      "KickMembers",
+      "ModerateMembers",
+      "ViewAuditLog",
+    ],
     cooldownMs: 3_000,
     rateLimit: DEFAULT_RATE,
   }),

@@ -1,6 +1,7 @@
 import { ActivityType } from "discord.js";
 import { deployCommands } from "../lib/deploy-commands";
 import { serializeError } from "../lib/errors";
+import { ensureGuildRow } from "../lib/guilds";
 import { defineEvent } from "./types";
 
 export const event = defineEvent({
@@ -22,6 +23,11 @@ export const event = defineEvent({
       },
       "gateway ready",
     );
+
+    // Existing guilds (installed before this boot) still need their row.
+    for (const guild of client.guilds.cache.values()) {
+      await ensureGuildRow(guild, client.logger);
+    }
 
     try {
       user.setPresence({
