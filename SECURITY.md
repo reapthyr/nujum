@@ -49,16 +49,30 @@ permission checks, diff/revert and schema validation.
 
 ---
 
+## Implemented in Phase 2 (bot foundation)
+
+| Control                                                                                         | Location                                    |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Explicit zod env contract; failures name variables, never values                                | `apps/bot/src/config/env.ts`                |
+| Nine required intents only; privileged intents documented in `.env.example`                     | `apps/bot/src/client/NujumClient.ts`        |
+| Global `unhandledRejection` / `uncaughtException` guards + graceful shutdown                    | `apps/bot/src/core/`                        |
+| Per-command user/guild/global rate limits and cooldowns                                         | `apps/bot/src/lib/cooldowns.ts`             |
+| Permission + bot-permission re-checks and role hierarchy at execution                           | `apps/bot/src/lib/permissions.ts`           |
+| Namespaced component ids with user/guild ownership checks                                       | `apps/bot/src/lib/components.ts`            |
+| Global `allowedMentions { parse: [] }`; sanitized user input                                    | `apps/bot/src/client/NujumClient.ts`        |
+| Ephemeral, generic user errors; full errors only in structured logs                             | `apps/bot/src/lib/errors.ts`                |
+| pino redaction of tokens, cookies, HMAC headers and database URLs                               | `apps/bot/src/lib/logger.ts`                |
+| HMAC-SHA256 + timestamp + single-use nonce on `/v1/*`, optional CIDR allowlist, per-IP limits   | `apps/bot/src/api/`                         |
+| `/healthz` + `/readyz` with no secrets; 503 when DB/gateway is down                             | `apps/bot/src/api/server.ts`                |
+| Container: non-root, read-only rootfs, no capabilities, `no-new-privileges`, Caddy-only ingress | `apps/bot/Dockerfile`, `docker-compose.yml` |
+
+Tests: 54 bot tests cover env failures, CIDR/IP parsing, custom-id tampering and ownership,
+cooldowns/rate limits, loader safety, permission mapping, command-manifest parity and the API
+(health, HMAC success/replay/wrong-path, malformed JSON, 404, IP allowlist).
+
+---
+
 ## Planned controls by phase
-
-### Phase 2 — bot foundation
-
-- Gateway intents: `Guilds`, `GuildMembers` (privileged), `GuildModeration`, `GuildMessages`,
-  `MessageContent` (privileged), `GuildMessageReactions`, `GuildVoiceStates`, `GuildInvites`,
-  `DirectMessages`. Each documented with a reason; features degrade gracefully without privileged
-  intents.
-- Global `unhandledRejection` / `uncaughtException` handlers; graceful shutdown.
-- Ephemeral, friendly user errors; full errors only in structured logs.
 
 ### Phase 3 — bot security layer
 
@@ -107,7 +121,7 @@ permission checks, diff/revert and schema validation.
 - [ ] Dashboard → bot requests signed and replay-protected (Phase 4).
 - [ ] Database credentials restricted to pooled/direct roles (Phase 14).
 - [ ] GitHub Actions uses environment-scoped secrets (Phase 14).
-- [ ] Logs redact tokens, HMAC headers and connection strings (Phase 2/4).
+- [x] Logs redact tokens, HMAC headers and connection strings (Phase 2).
 
 ---
 

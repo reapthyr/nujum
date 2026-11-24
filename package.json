@@ -2,6 +2,7 @@
   "name": "nujum",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@12.23.0",
   "description": "Nujum — all-in-one Discord bot plus a separate admin dashboard",
   "license": "UNLICENSED",
   "engines": {
@@ -9,12 +10,14 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "build": "pnpm --filter @nujum/shared build",
+    "build": "pnpm --filter @nujum/shared build && pnpm --filter @nujum/bot build",
     "build:shared": "pnpm --filter @nujum/shared build",
-    "typecheck": "pnpm --filter @nujum/shared typecheck",
-    "test": "pnpm --filter @nujum/shared test",
+    "dev:bot": "pnpm --filter @nujum/bot dev",
+    "start:bot": "pnpm --filter @nujum/bot start",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
     "test:watch": "pnpm --filter @nujum/shared test:watch",
-    "lint": "pnpm --filter @nujum/shared lint",
+    "lint": "pnpm -r lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @nujum/shared db:generate",

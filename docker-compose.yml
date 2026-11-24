@@ -1,0 +1,82 @@
+# Production compose stack for the Nujum bot.
+#
+#   cp .env.compose.example .env.compose   # domain + ACME email
+#   cp apps/bot/.env.example apps/bot/.env # fill in the real secrets
+#   docker compose --env-file .env.compose up -d --build
+#
+# Only Caddy publishes ports. The bot binds 0.0.0.0 inside the private compose
+# network and is unreachable from the internet except through Caddy.
+
+name: nujum
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    image: nujum-bot:latest
+    restart: unless-stopped
+    env_file:
+      - ./apps/bot/.env
+    environment:
+      NODE_ENV: production
+      BOT_API_HOST: 0.0.0.0
+      BOT_API_PORT: "8080"
+      # Caddy is the only peer, so X-Forwarded-For is trustworthy here.
+      BOT_API_TRUST_PROXY: "true"
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.BOT_API_PORT||8080)+'/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      bot:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      BOT_API_DOMAIN: ${BOT_API_DOMAIN:?set BOT_API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@nujum.app}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  caddy_data:
+  caddy_config:

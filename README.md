@@ -6,13 +6,14 @@ Nujum is a production-grade monorepo with two independently deployable apps that
 PostgreSQL database and one contracts package:
 
 - **`apps/bot`** — discord.js v14 bot + small Fastify API, hosted on an Oracle Cloud VPS in Docker
-  behind Caddy (automatic HTTPS). _(Phase 2+)_
+  behind Caddy (automatic HTTPS). _(Phase 2 complete)_
 - **`apps/dashboard`** — Next.js 15 admin dashboard on Vercel. _(Phase 5+)_
 - **`packages/shared`** — Prisma schema/client, zod contracts, DTOs, constants, permission
   definitions and the HMAC implementation.
 
-> **Phase 1 status:** workspace, shared package, database schema, first migration and 78 unit tests
-> are complete. The bot and dashboard apps arrive in later phases.
+> **Status:** Phase 1 (workspace, shared package, database schema, first migration, 78 tests) and
+> Phase 2 (bot foundation: client, commands, handlers, internal HMAC API, Docker/Caddy, 54 tests)
+> are complete. The dashboard arrives in Phase 5.
 
 ---
 
@@ -73,7 +74,9 @@ flowchart LR
 ```
 nujum/
 ├─ apps/
-│  ├─ bot/                    # Phase 2+ (discord.js, Fastify, Docker, Caddy)
+│  ├─ bot/                    # Phase 2: discord.js, Fastify, commands, Docker
+│  │  ├─ Dockerfile           # multi-stage, multi-arch, non-root
+│  │  └─ src/                 # api, client, commands, events, handlers, lib
 │  └─ dashboard/              # Phase 5+ (Next.js 15 on Vercel)
 ├─ packages/shared/
 │  ├─ prisma/
@@ -90,9 +93,12 @@ nujum/
 │     ├─ sanitize.ts          # control-char stripping, mention neutralization
 │     ├─ audit-diff.ts        # before/after diff + revert
 │     └─ prisma.ts            # serverless-safe Prisma singleton
+├─ docker/
+│  └─ Caddyfile               # automatic HTTPS reverse proxy for the Bot API
 ├─ docs/
 │  ├─ database.md
-│  └─ (deployment, API and command docs land in later phases)
+│  └─ bot.md                  # bot architecture, API contract, deployment
+├─ docker-compose.yml         # bot + Caddy production stack
 ├─ SECURITY.md
 └─ README.md
 ```
@@ -128,29 +134,43 @@ pnpm test
 pnpm lint
 ```
 
+Run the bot (see [`docs/bot.md`](docs/bot.md) for the full guide):
+
+```bash
+cp apps/bot/.env.example apps/bot/.env    # token, client id, database URL, HMAC secret
+pnpm --filter @nujum/bot dev              # tsx watch
+pnpm --filter @nujum/bot deploy:commands  # register slash commands
+```
+
 Useful scripts:
 
-| Command                         | Purpose                                       |
-| ------------------------------- | --------------------------------------------- |
-| `pnpm build:shared`             | `prisma generate` + compile shared to `dist/` |
-| `pnpm db:generate`              | regenerate the Prisma client                  |
-| `pnpm db:migrate`               | create/apply a dev migration                  |
-| `pnpm db:deploy`                | apply committed migrations (CI/production)    |
-| `pnpm db:studio`                | Prisma Studio                                 |
-| `pnpm test` / `pnpm test:watch` | Vitest                                        |
-| `pnpm format`                   | Prettier                                      |
-
-> Apps are added in later phases; `pnpm dev` appears once the bot exists.
+| Command                                    | Purpose                                                |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `pnpm build`                               | Build shared + bot (compiled `dist/`)                  |
+| `pnpm build:shared`                        | `prisma generate` + compile shared to `dist/`          |
+| `pnpm dev:bot`                             | Bot in watch mode                                      |
+| `pnpm start:bot`                           | Run the compiled bot                                   |
+| `pnpm --filter @nujum/bot start:sharded`   | ShardingManager (requires `SHARD_COUNT>1` and a build) |
+| `pnpm --filter @nujum/bot deploy:commands` | Register slash commands (global, or `DEV_GUILD_ID`)    |
+| `pnpm db:generate`                         | Regenerate the Prisma client                           |
+| `pnpm db:migrate`                          | Create/apply a dev migration                           |
+| `pnpm db:deploy`                           | Apply committed migrations (CI/production)             |
+| `pnpm db:studio`                           | Prisma Studio                                          |
+| `pnpm test` / `pnpm test:watch`            | Vitest                                                 |
+| `pnpm format`                              | Prettier                                               |
 
 ### Environment
 
 `packages/shared/.env.example` documents the database and HMAC variables shared by both
-deployables. Each app gets its own `.env.example` when it is created:
+deployables. Each app has its own example file:
 
-- **Bot:** Discord token/client ID, guild ID for dev commands, API bind/port, HMAC secret, IP
-  allowlist, log level.
-- **Dashboard:** Auth.js secret/URL, Discord OAuth credentials, database URLs, bot API base URL +
-  HMAC secret, owner IDs, Upstash (optional).
+- **Bot** (`apps/bot/.env.example`): Discord token/client ID, dev guild, owner IDs, database URLs,
+  API bind/port, HMAC secret (+ previous for rotation), IP allowlist, sharding, presence.
+- **Dashboard** (Phase 5): Auth.js secret/URL, Discord OAuth credentials, database URLs, bot API
+  base URL + HMAC secret, owner IDs, Upstash (optional).
+
+Docker deployments add `.env.compose` (see `.env.compose.example`) for the public hostname and ACME
+email.
 
 ---
 
@@ -222,8 +242,8 @@ See [SECURITY.md](SECURITY.md) for the full model and phase-by-phase controls.
 | Phase | Scope                                                           | Status      |
 | ----- | --------------------------------------------------------------- | ----------- |
 | 1     | Monorepo, shared package, Prisma schema, migration, tests       | ✅ complete |
-| 2     | Bot foundation: client, handlers, commands, Docker              | next        |
-| 3     | Bot security layer: permissions, hierarchy, anti-raid/nuke/spam |             |
+| 2     | Bot foundation: client, handlers, commands, Docker              | ✅ complete |
+| 3     | Bot security layer: permissions, hierarchy, anti-raid/nuke/spam | next        |
 | 4     | Bot API + HMAC + dashboard client                               |             |
 | 5     | Dashboard auth, layout, landing                                 |             |
 | 6–13  | Tickets, JTC, help, moderation, logging, welcome, pages, extras |             |

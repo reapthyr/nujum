@@ -1,0 +1,41 @@
+# Caddy reverse proxy for the Nujum Bot API.
+#
+# Terminates TLS (Let's Encrypt, automatic) and forwards only to the bot
+# container. The bot port is never published on the host, so the only way in is
+# through this proxy.
+#
+# Environment (see .env.compose.example):
+#   BOT_API_DOMAIN  public hostname, e.g. api.nujum.app
+#   ACME_EMAIL      Let's Encrypt contact address
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$BOT_API_DOMAIN} {
+	encode zstd gzip
+
+	# The Bot API only accepts small JSON payloads; reject anything larger early.
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy bot:8080 {
+		health_uri /healthz
+		health_interval 30s
+		health_timeout 5s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
