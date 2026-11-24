@@ -98,9 +98,18 @@ as a plain Node process under `systemd`.
 
 1. Harden SSH: key-only login, disable password auth, disable root login, enable `ufw` and
    `unattended-upgrades`/`fail2ban`.
-2. In **both** the Oracle VCN security list and `ufw`, allow inbound TCP `8080` from `0.0.0.0/0` (the
-   dashboard calls `BOT_API_URL` over the public internet). Keep 22 restricted to your IP.
-   Requests are authenticated with `BOT_API_HMAC_SECRET`; do not expose other ports.
+2. In **both** the Oracle VCN security list and the instance firewall, allow inbound TCP `8080` from
+   `0.0.0.0/0` (the dashboard calls `BOT_API_URL` over the public internet). Oracle Ubuntu images ship
+   an `iptables` catch-all `REJECT` after the SSH rule; insert the accept before it and persist it:
+
+   ```bash
+   sudo iptables -I INPUT 5 -p tcp --dport 8080 -j ACCEPT
+   sudo apt-get install -y iptables-persistent
+   sudo netfilter-persistent save
+   ```
+
+   Keep 22 restricted to your IP. Requests are authenticated with `BOT_API_HMAC_SECRET`; do not
+   expose other ports.
 3. Install Node 22 and pnpm:
 
    ```bash
