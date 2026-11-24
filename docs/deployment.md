@@ -178,6 +178,10 @@ docker inspect --format '{{json .State.Health}}' nujum-bot-1
    Never use `NEXT_PUBLIC_*` for a secret: the build fails on purpose. Secrets are available only to
    server code. GitHub Actions secrets must be environment-scoped (`production`).
 
+   If the variables were added only to **Production**, a plain `vercel deploy` still creates a
+   **Preview** deployment and the build will fail the env guard with "Required" errors. Deploy with
+   `vercel deploy --prod`, or add the same variables to Preview/Development as well.
+
 3. Deploy, then open `https://dashboard.example.com/login` and sign in with Discord. The OAuth
    callback must be the exact redirect URI registered in §2.
 
