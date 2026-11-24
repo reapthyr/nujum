@@ -16,6 +16,10 @@
       "types": "./dist/prisma.d.ts",
       "default": "./dist/prisma.js"
     },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
     "./hmac": {
       "types": "./dist/hmac.d.ts",
       "default": "./dist/hmac.js"

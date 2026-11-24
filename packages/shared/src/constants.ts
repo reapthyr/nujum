@@ -211,11 +211,22 @@ export const CONFIG_POLL_INTERVAL_MS = 10_000;
 /** Config cache TTL guard, independent of notifications. */
 export const CONFIG_CACHE_TTL_MS = 30_000;
 
+/** Dashboard live actions that may be sent to the bot or safely queued. */
+export const BOT_ACTION_TYPES = [
+  "SEND_MESSAGE",
+  "ANNOUNCEMENT",
+  "PUBLISH_VERIFICATION_PANEL",
+  "SET_LOCKDOWN",
+] as const;
+
+export const LIVE_ACTION_STATUSES = ["SENT", "QUEUED", "SKIPPED"] as const;
+
 export const HMAC_CONSTANTS = {
   headerKeyId: "x-nujum-key-id",
   headerTimestamp: "x-nujum-timestamp",
   headerNonce: "x-nujum-nonce",
   headerSignature: "x-nujum-signature",
+  headerActor: "x-nujum-actor",
   windowMs: 60_000,
   nonceTtlMs: 5 * 60_000,
   maxNonceEntries: 10_000,

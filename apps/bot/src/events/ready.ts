@@ -29,6 +29,11 @@ export const event = defineEvent({
       await ensureGuildRow(guild, client.logger);
     }
 
+    const drained = await client.queue.drain(25);
+    if (drained.claimed > 0) {
+      client.logger.info({ ...drained }, "queued dashboard actions drained");
+    }
+
     try {
       user.setPresence({
         status: client.env.BOT_STATUS,

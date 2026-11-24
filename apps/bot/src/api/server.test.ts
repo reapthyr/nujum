@@ -2,11 +2,16 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { Client } from "discord.js";
 import pino from "pino";
 import { signRequest } from "@nujum/shared/hmac";
-import { createApiServer } from "./server";
+import type { BotActionResult, BotGuildSnapshot } from "@nujum/shared";
+import { createApiServer, type ApiServices } from "./server";
+import type { LiveActions } from "./live-actions";
+import type { QueueService } from "./queue";
 import { loadEnv, type BotEnv } from "../config/env";
 import type { BotLogger } from "../lib/logger";
 
 const SECRET = "s".repeat(64);
+const GUILD = "123456789012345678";
+const ACTOR = "987654321098765432";
 
 function envWith(overrides: Record<string, string> = {}): BotEnv {
   return loadEnv({
@@ -24,18 +29,74 @@ function envWith(overrides: Record<string, string> = {}): BotEnv {
 const logger = pino({ level: "silent" }) as unknown as BotLogger;
 const client = new Client({ intents: [] });
 
+const snapshot: BotGuildSnapshot = {
+  online: true,
+  guild: {
+    id: GUILD,
+    name: "Test Guild",
+    memberCount: 42,
+    iconUrl: null,
+    ownerId: ACTOR,
+    botPermissions: ["SendMessages"],
+  },
+  channels: [{ id: "111111111111111111", name: "general", type: "text", parentId: null }],
+  roles: [{ id: "222222222222222222", name: "Member", color: 0, position: 1 }],
+};
+
+type TestServices = ApiServices & {
+  sendMessage: ReturnType<typeof vi.fn>;
+  drain: ReturnType<typeof vi.fn>;
+};
+
+function services(): TestServices {
+  const result: BotActionResult = {
+    type: "SEND_MESSAGE",
+    status: "SENT",
+    messageId: "333333333333333333",
+  };
+  const sendMessage = vi.fn(() => Promise.resolve(result));
+  const drain = vi.fn(() => Promise.resolve({ claimed: 1, sent: 1, failed: 0, skipped: 0 }));
+  const actions: LiveActions = {
+    snapshot: vi.fn(() => Promise.resolve(snapshot)),
+    sendMessage,
+    announcement: vi.fn(() => Promise.resolve({ ...result, type: "ANNOUNCEMENT" as const })),
+    publishVerificationPanel: vi.fn(() =>
+      Promise.resolve({ ...result, type: "PUBLISH_VERIFICATION_PANEL" as const }),
+    ),
+    setLockdown: vi.fn(() => Promise.resolve({ ...result, type: "SET_LOCKDOWN" as const })),
+  };
+  const queue: QueueService = {
+    depth: vi.fn(() => Promise.resolve(3)),
+    drain,
+  };
+  return { actions, queue, sendMessage, drain };
+}
+
 function signed(path = "/v1/meta") {
   return signRequest({ secret: SECRET, method: "GET", path, body: "" }).headers;
 }
 
+function signedPost(path: string, body: unknown, headers: Record<string, string> = {}) {
+  const payload = JSON.stringify(body);
+  return {
+    ...signRequest({ secret: SECRET, method: "POST", path, body: payload }).headers,
+    "content-type": "application/json",
+    "x-nujum-actor": ACTOR,
+    ...headers,
+  };
+}
+
 describe("internal API", () => {
   let app: Awaited<ReturnType<typeof createApiServer>>;
+  let depsServices: TestServices;
 
   beforeAll(async () => {
+    depsServices = services();
     app = await createApiServer({
       env: envWith(),
       logger,
       client,
+      services: depsServices,
       databaseHealthy: () => Promise.resolve(false),
       startedAt: Date.now() - 5_000,
       version: "0.2.0-test",
@@ -73,6 +134,7 @@ describe("internal API", () => {
       env: envWith(),
       logger,
       client,
+      services: services(),
       databaseHealthy: () => Promise.resolve(true),
       startedAt: Date.now(),
     });
@@ -96,16 +158,19 @@ describe("internal API", () => {
     expect(body.error.message).not.toMatch(/stack|at Object/i);
   });
 
-  it("accepts a correctly signed request", async () => {
+  it("accepts a correctly signed request with a real queue depth", async () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/meta",
       headers: signed(),
     });
     expect(response.statusCode).toBe(200);
-    const body = response.json<{ data: { apiVersion: string; guildCount: number } }>();
+    const body = response.json<{
+      data: { apiVersion: string; guildCount: number; queueDepth: number };
+    }>();
     expect(body.data.apiVersion).toBe("v1");
     expect(body.data.guildCount).toBe(0);
+    expect(body.data.queueDepth).toBe(3);
   });
 
   it("rejects a replayed nonce", async () => {
@@ -138,6 +203,68 @@ describe("internal API", () => {
     expect(response.statusCode).toBe(404);
     expect(response.json<{ error: { code: string } }>().error.code).toBe("NOT_FOUND");
   });
+
+  it("returns a validated guild snapshot", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/guilds/${GUILD}`,
+      headers: signed(`/v1/guilds/${GUILD}`),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ data: BotGuildSnapshot }>().data.guild.name).toBe("Test Guild");
+  });
+
+  it("sends a validated live message with the dashboard actor", async () => {
+    const path = `/v1/guilds/${GUILD}/messages`;
+    const body = { channelId: "111111111111111111", content: "hello" };
+    const response = await app.inject({
+      method: "POST",
+      url: path,
+      headers: signedPost(path, body),
+      payload: body,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ data: BotActionResult }>().data.status).toBe("SENT");
+    expect(depsServices.sendMessage).toHaveBeenCalledWith(
+      GUILD,
+      expect.objectContaining({ content: "hello" }),
+      ACTOR,
+    );
+  });
+
+  it("rejects live mutations without a dashboard actor", async () => {
+    const path = `/v1/guilds/${GUILD}/messages`;
+    const body = { channelId: "111111111111111111", content: "hello" };
+    const headers = signedPost(path, body, { "x-nujum-actor": "not-a-snowflake" });
+    const response = await app.inject({ method: "POST", url: path, headers, payload: body });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: expect.objectContaining({ code: "BAD_REQUEST" }) });
+  });
+
+  it("rejects live actions that fail zod validation", async () => {
+    const path = `/v1/guilds/${GUILD}/lockdown`;
+    const body = { active: "yes" };
+    const response = await app.inject({
+      method: "POST",
+      url: path,
+      headers: signedPost(path, body),
+      payload: body,
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("drains the offline queue through a signed endpoint", async () => {
+    const path = "/v1/queue/drain";
+    const response = await app.inject({
+      method: "POST",
+      url: path,
+      headers: signedPost(path, { limit: 5 }),
+      payload: { limit: 5 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ data: { sent: number } }>().data.sent).toBe(1);
+    expect(depsServices.drain).toHaveBeenCalledWith(5);
+  });
 });
 
 describe("IP allowlist", () => {
@@ -146,6 +273,7 @@ describe("IP allowlist", () => {
       env: envWith({ BOT_API_IP_ALLOWLIST: "10.0.0.0/8" }),
       logger,
       client,
+      services: services(),
       databaseHealthy: () => Promise.resolve(true),
       startedAt: Date.now(),
     });

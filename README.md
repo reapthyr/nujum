@@ -7,14 +7,14 @@ PostgreSQL database and one contracts package:
 
 - **`apps/bot`** — discord.js v14 bot + small Fastify API, hosted on an Oracle Cloud VPS in Docker
   behind Caddy (automatic HTTPS). _(Phase 2 complete)_
-- **`apps/dashboard`** — Next.js 15 admin dashboard on Vercel. _(Phase 5+)_
+- **`apps/dashboard`** — Next.js 15 admin dashboard on Vercel. _(Phase 4 complete)_
 - **`packages/shared`** — Prisma schema/client, zod contracts, DTOs, constants, permission
   definitions and the HMAC implementation.
 
-> **Status:** Phase 1 (workspace, shared package, database schema, first migration, 78 tests) and
-> Phase 2 (bot foundation: client, commands, handlers, internal HMAC API, Docker/Caddy, 54 tests)
-> and Phase 3 (bot security layer: anti-raid/nuke/spam, escalation response, lockdown and
-> verification) are complete. The dashboard arrives in Phase 5.
+> **Status:** Phases 1–4 are complete: workspace, shared contracts and schema, bot foundation, the
+> security layer, hot-reload config, live Bot API actions with durable queue draining, and the
+> Next.js dashboard with Discord OAuth, server-side authorization, audit/revert and offline queue
+> handling. 186 unit tests pass (82 shared + 90 bot + 14 dashboard).
 
 ---
 
@@ -75,10 +75,10 @@ flowchart LR
 ```
 nujum/
 ├─ apps/
-│  ├─ bot/                    # Phase 2: discord.js, Fastify, commands, Docker
+│  ├─ bot/                    # discord.js, Fastify, commands, config watcher, Docker
 │  │  ├─ Dockerfile           # multi-stage, multi-arch, non-root
-│  │  └─ src/                 # api, client, commands, events, handlers, lib
-│  └─ dashboard/              # Phase 5+ (Next.js 15 on Vercel)
+│  │  └─ src/                 # api, client, commands, config, events, handlers, lib
+│  └─ dashboard/              # Next.js 15 on Vercel (App Router + Server Actions)
 ├─ packages/shared/
 │  ├─ prisma/
 │  │  ├─ schema.prisma        # 66 models, single source of truth
@@ -88,6 +88,7 @@ nujum/
 │     ├─ modules.ts           # 21 module definitions + dashboard paths
 │     ├─ permissions.ts       # 34 commands with user/bot permissions & cooldowns
 │     ├─ zod/                 # contracts for every config, action and API route
+│     ├─ config.ts            # LISTEN/NOTIFY listener + transactional pg_notify writer
 │     ├─ hmac.ts              # canonical request, sign, verify, nonce cache
 │     ├─ rate-limit.ts        # token buckets + multi-rule limiter
 │     ├─ env.ts               # env validation + NEXT_PUBLIC_ secret guard
@@ -97,8 +98,9 @@ nujum/
 ├─ docker/
 │  └─ Caddyfile               # automatic HTTPS reverse proxy for the Bot API
 ├─ docs/
-│  ├─ database.md
-│  └─ bot.md                  # bot architecture, API contract, deployment
+│  ├─ database.md             # pooling, migrations, NOTIFY, queue semantics
+│  ├─ bot.md                  # bot architecture, API contract, deployment
+│  └─ security.md             # detectors, verification and escalation
 ├─ docker-compose.yml         # bot + Caddy production stack
 ├─ SECURITY.md
 └─ README.md
@@ -143,11 +145,22 @@ pnpm --filter @nujum/bot dev              # tsx watch
 pnpm --filter @nujum/bot deploy:commands  # register slash commands
 ```
 
+Run the dashboard (see [`apps/dashboard/.env.example`](apps/dashboard/.env.example)):
+
+```bash
+cp apps/dashboard/.env.example apps/dashboard/.env   # OAuth + bot API HMAC secret
+pnpm --filter @nujum/dashboard dev                   # http://localhost:3000
+```
+
+Set the Discord OAuth redirect URI to `<NEXT_PUBLIC_APP_URL>/api/auth/callback/discord`. The
+HMAC secret must be identical in both apps; a mismatch makes every live action fail with
+`UNAUTHORIZED`.
+
 Useful scripts:
 
 | Command                                    | Purpose                                                |
 | ------------------------------------------ | ------------------------------------------------------ |
-| `pnpm build`                               | Build shared + bot (compiled `dist/`)                  |
+| `pnpm build`                               | Build shared + bot + dashboard (production builds)     |
 | `pnpm build:shared`                        | `prisma generate` + compile shared to `dist/`          |
 | `pnpm dev:bot`                             | Bot in watch mode                                      |
 | `pnpm start:bot`                           | Run the compiled bot                                   |
@@ -167,8 +180,9 @@ deployables. Each app has its own example file:
 
 - **Bot** (`apps/bot/.env.example`): Discord token/client ID, dev guild, owner IDs, database URLs,
   API bind/port, HMAC secret (+ previous for rotation), IP allowlist, sharding, presence.
-- **Dashboard** (Phase 5): Auth.js secret/URL, Discord OAuth credentials, database URLs, bot API
-  base URL + HMAC secret, owner IDs, Upstash (optional).
+- **Dashboard** (`apps/dashboard/.env.example`): Auth.js secret/URL, Discord OAuth credentials,
+  database URLs, bot API base URL + HMAC secret, super-admin IDs, session/re-auth windows and rate
+  limits.
 
 Docker deployments add `.env.compose` (see `.env.compose.example`) for the public hostname and ACME
 email.
@@ -225,7 +239,7 @@ Highlights:
 
 ## Security
 
-Phase 1 delivers the foundations:
+Every phase builds on these foundations:
 
 - No hardcoded secrets; `parseEnv` crashes with variable names only (never values).
 - `assertNoPublicSecrets` fails the dashboard build if a secret uses `NEXT_PUBLIC_`.
@@ -245,8 +259,8 @@ See [SECURITY.md](SECURITY.md) for the full model and phase-by-phase controls.
 | 1     | Monorepo, shared package, Prisma schema, migration, tests       | ✅ complete |
 | 2     | Bot foundation: client, handlers, commands, Docker              | ✅ complete |
 | 3     | Bot security layer: permissions, hierarchy, anti-raid/nuke/spam | ✅ complete |
-| 4     | Bot API + HMAC + dashboard client                               |             |
-| 5     | Dashboard auth, layout, landing                                 |             |
+| 4     | Config hot-reload, Bot API live actions/queue, dashboard client | ✅ complete |
+| 5     | Dashboard auth, layout, landing                                 | ✅ complete |
 | 6–13  | Tickets, JTC, help, moderation, logging, welcome, pages, extras |             |
 | 14    | Deployment docs, CI/CD, Playwright E2E                          |             |
 

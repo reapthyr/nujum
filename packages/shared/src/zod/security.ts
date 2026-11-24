@@ -36,6 +36,8 @@ export const securityConfigSchema = z.object({
   autoLockdown: z.boolean(),
 });
 
+export type SecurityConfigInput = z.infer<typeof securityConfigSchema>;
+
 export const securityWhitelistEntrySchema = z.object({
   type: zEnum(WHITELIST_TYPES),
   value: shortTextSchema(253),

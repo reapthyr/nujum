@@ -44,6 +44,8 @@ export const verificationConfigSchema = z.object({
     .optional(),
 });
 
+export type VerificationConfigInput = z.infer<typeof verificationConfigSchema>;
+
 export const verificationSubmitSchema = z.object({
   code: z.string().max(128).optional(),
 });

@@ -12,3 +12,5 @@ export * from "./audit";
 export * from "./backup";
 export * from "./admin";
 export * from "./bot-api";
+export * from "./config-bus";
+export * from "./live";

@@ -12,6 +12,8 @@ import { NukeDetector } from "../security/nuke";
 import { SecurityThrottle } from "../security/throttle";
 import { VerificationService } from "../security/verification/service";
 import { ModuleService } from "../lib/modules";
+import { DiscordLiveActions } from "../api/live-actions";
+import { DatabaseQueueService } from "../api/queue";
 
 /**
  * Intents are deliberately minimal and documented in docs/bot.md.
@@ -73,6 +75,8 @@ export class NujumClient extends Client {
   readonly spamDetector = new SpamDetector();
   readonly nukeDetector = new NukeDetector();
   readonly securityThrottle = new SecurityThrottle();
+  readonly liveActions: DiscordLiveActions;
+  readonly queue: DatabaseQueueService;
   readonly owners: ReadonlySet<string>;
   readonly startedAt = Date.now();
 
@@ -84,6 +88,8 @@ export class NujumClient extends Client {
     this.security = new GuildSecurityService(new PrismaSecurityRepository(), logger);
     this.verification = new VerificationService(logger);
     this.modules = new ModuleService(logger);
+    this.liveActions = new DiscordLiveActions(this, logger);
+    this.queue = new DatabaseQueueService(this.liveActions, logger);
   }
 
   get uptimeSeconds(): number {

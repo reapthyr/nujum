@@ -5,3 +5,4 @@ coverage
 pnpm-lock.yaml
 packages/shared/generated
 packages/shared/prisma/migrations
+**/next-env.d.ts

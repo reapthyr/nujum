@@ -6,6 +6,7 @@ import { NujumClient } from "./client/NujumClient";
 import { loadCommands, loadEvents } from "./client/loaders";
 import { BOT_VERSION } from "./config/constants";
 import { loadEnv, type BotEnv } from "./config/env";
+import { ConfigWatcher } from "./config/watcher";
 import { installProcessGuards } from "./core/runtime";
 import { ShutdownManager } from "./core/shutdown";
 import { registerInteractionRoutes } from "./handlers/interactions/routes";
@@ -44,6 +45,17 @@ async function main(): Promise<void> {
   );
 
   const client = new NujumClient(env, logger);
+  const watcher = new ConfigWatcher({
+    logger,
+    // DIRECT_URL is required for LISTEN; pooled URLs fall back to polling.
+    connectionString: env.DIRECT_URL ?? env.DATABASE_URL,
+    guildIds: () => [...client.guilds.cache.keys()],
+    invalidate: (guildId) => {
+      client.security.invalidate(guildId);
+      client.verification.invalidate(guildId);
+      client.modules.invalidate(guildId);
+    },
+  });
   await loadCommands(client);
   await loadEvents(client);
   registerInteractionRoutes(client);
@@ -52,12 +64,14 @@ async function main(): Promise<void> {
     env,
     logger,
     client,
+    services: { actions: client.liveActions, queue: client.queue },
     startedAt: client.startedAt,
     databaseHealthy: createDatabaseHealth(logger),
   });
 
   // Registered database → client → api; hooks run in reverse (api, client, db).
   shutdown.register("database", () => disconnectPrisma());
+  shutdown.register("watcher", () => watcher.stop());
   shutdown.register("gateway", () => client.shutdown("shutdown"));
   shutdown.register("api", () => api.close());
 
@@ -68,6 +82,14 @@ async function main(): Promise<void> {
     logger.fatal({ err: serializeError(error) }, "failed to start internal API");
     await shutdown.shutdown("api-listen-failed", 1);
     return;
+  }
+
+  try {
+    await watcher.start();
+  } catch (error) {
+    // The 10-second poll fallback still runs from the watcher itself; a failed
+    // LISTEN connection must never prevent the gateway from starting.
+    logger.warn({ err: serializeError(error) }, "config listener start failed");
   }
 
   try {

@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #080b14;
+  --color-surface: #0f1424;
+  --color-surface-raised: #161d32;
+  --color-border: #26304a;
+  --color-foreground: #f4f6ff;
+  --color-muted: #9aa6c4;
+  --color-primary: #8b5cf6;
+  --color-primary-foreground: #ffffff;
+  --color-accent: #22d3ee;
+  --color-danger: #fb7185;
+  --color-success: #34d399;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at 15% -10%,
+      color-mix(in srgb, var(--color-primary) 22%, transparent),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 90% 0%,
+      color-mix(in srgb, var(--color-accent) 12%, transparent),
+      transparent 32%
+    ),
+    var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-primary) 55%, transparent);
+}
+
+.card-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent),
+    0 24px 70px -40px rgba(0, 0, 0, 0.9);
+}
+
+.grid-fade {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-border) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-border) 45%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black, transparent 75%);
+}

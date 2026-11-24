@@ -105,6 +105,11 @@ export const announcementBodySchema = z
 
 export const lockdownBodySchema = lockdownSchema;
 
+export type SendMessageInput = z.infer<typeof sendMessageBodySchema>;
+export type AnnouncementInput = z.infer<typeof announcementBodySchema>;
+export type PublishVerificationInput = z.infer<typeof publishVerificationBodySchema>;
+export type LockdownInput = z.infer<typeof lockdownBodySchema>;
+
 export const revokeCaseBodySchema = z.object({
   reason: reasonSchema,
 });

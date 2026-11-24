@@ -10,7 +10,7 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "build": "pnpm --filter @nujum/shared build && pnpm --filter @nujum/bot build",
+    "build": "pnpm --filter @nujum/shared build && pnpm --filter @nujum/bot build && pnpm --filter @nujum/dashboard build",
     "build:shared": "pnpm --filter @nujum/shared build",
     "dev:bot": "pnpm --filter @nujum/bot dev",
     "start:bot": "pnpm --filter @nujum/bot start",

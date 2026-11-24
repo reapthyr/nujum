@@ -1,4 +1,4 @@
-# Nujum bot — Phase 2 foundation
+# Nujum bot — runtime, config watcher and internal API
 
 The bot is a standalone Node process: discord.js v14 for the gateway, Fastify 5 for an internal
 HTTP API, Prisma for PostgreSQL and pino for structured logs. It is deployed as a Docker image on
@@ -11,10 +11,10 @@ apps/bot/
 ├─ src/
 │  ├─ index.ts                # single-process entry point
 │  ├─ shard.ts                # ShardingManager entry point (BOT_MODE=sharded)
-│  ├─ api/                    # Fastify server, per-IP rate limits, HMAC guard
+│  ├─ api/                    # Fastify server, HMAC guard, live actions, queue drain
+│  ├─ config/                 # zod env contract + LISTEN/NOTIFY watcher
 │  ├─ client/                 # NujumClient + command/event auto-loading
 │  ├─ commands/               # ping, botinfo, help, invite, support
-│  ├─ config/                 # zod env contract + constants
 │  ├─ core/                   # process guards + graceful shutdown
 │  ├─ events/                 # ready, interactionCreate, guild*, error, warn, shard*
 │  ├─ handlers/               # command execution, component/modal routing
@@ -62,12 +62,12 @@ runtime manifest cannot drift.
 
 Copy `apps/bot/.env.example` to `apps/bot/.env`. Required:
 
-| Variable              | Notes                                                                   |
-| --------------------- | ----------------------------------------------------------------------- |
-| `DISCORD_TOKEN`       | Bot token; minimum length and character set are validated.              |
-| `DISCORD_CLIENT_ID`   | Application id (snowflake).                                             |
-| `DATABASE_URL`        | Pooled PostgreSQL URL. Required even though Phase 2 does not query yet. |
-| `BOT_API_HMAC_SECRET` | 32+ random bytes (`openssl rand -hex 32`). Shared with the dashboard.   |
+| Variable              | Notes                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| `DISCORD_TOKEN`       | Bot token; minimum length and character set are validated.            |
+| `DISCORD_CLIENT_ID`   | Application id (snowflake).                                           |
+| `DATABASE_URL`        | Pooled PostgreSQL URL used by Prisma at runtime.                      |
+| `BOT_API_HMAC_SECRET` | 32+ random bytes (`openssl rand -hex 32`). Shared with the dashboard. |
 
 Common optional values: `DIRECT_URL` (migrations), `DEV_GUILD_ID`, `OWNER_IDS` (CSV), `LOG_LEVEL`,
 `LOG_PRETTY`, `BOT_API_HOST`/`BOT_API_PORT`, `BOT_API_TRUST_PROXY`, `BOT_API_IP_ALLOWLIST` (CSV
@@ -84,11 +84,17 @@ Validation rules worth knowing:
 
 ## Internal API
 
-| Route      | Auth | Purpose                                                                                  |
-| ---------- | ---- | ---------------------------------------------------------------------------------------- |
-| `/healthz` | none | Liveness: status, version, uptime, timestamp. No secrets, no DB I/O.                     |
-| `/readyz`  | none | Readiness: 200 only when PostgreSQL answers **and** the gateway is ready; 503 otherwise. |
-| `/v1/meta` | HMAC | `MetaDTO`: version, shards, ping, uptime, guild/user counts, queue depth.                |
+| Route                                          | Auth | Purpose                                                                                  |
+| ---------------------------------------------- | ---- | ---------------------------------------------------------------------------------------- |
+| `/healthz`                                     | none | Liveness: status, version, uptime, timestamp. No secrets, no DB I/O.                     |
+| `/readyz`                                      | none | Readiness: 200 only when PostgreSQL answers **and** the gateway is ready; 503 otherwise. |
+| `/v1/meta`                                     | HMAC | `MetaDTO`: version, shards, ping, uptime, guild/user counts, queue depth.                |
+| `/v1/guilds/:guildId`                          | HMAC | Channel/role snapshot with live Discord permissions.                                     |
+| `POST /v1/guilds/:guildId/messages`            | HMAC | Send a message; `allowedMentions.parse` is always empty.                                 |
+| `POST /v1/guilds/:guildId/announcements`       | HMAC | `@everyone` announcement; requires explicit confirmation and bot permission.             |
+| `POST /v1/guilds/:guildId/panels/verification` | HMAC | Publish the verification panel to a re-checked channel.                                  |
+| `POST /v1/guilds/:guildId/lockdown`            | HMAC | Apply/clear lockdown with stored overwrites.                                             |
+| `POST /v1/queue/drain`                         | HMAC | Claim and drain pending dashboard actions with `FOR UPDATE SKIP LOCKED`.                 |
 
 Every `/v1` request is verified in this order: auth-failure rate limit → IP allowlist → HMAC
 signature + timestamp + nonce → authenticated rate limit. Errors are a stable envelope:
@@ -97,7 +103,11 @@ signature + timestamp + nonce → authenticated rate limit. Errors are a stable 
 { "error": { "code": "UNAUTHORIZED", "message": "Invalid request signature.", "requestId": "…" } }
 ```
 
-Codes: `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `BAD_REQUEST`, `RATE_LIMITED`, `INTERNAL`.
+Codes: `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `BAD_REQUEST`, `RATE_LIMITED`, `CONFLICT`,
+`GUILD_NOT_FOUND`, `BOT_OFFLINE`, `UPSTREAM_ERROR`, `INTERNAL`. Mutations additionally require a
+valid snowflake in `x-nujum-actor` and re-check guild membership, channel type and bot permissions
+before touching Discord. Rate rules: `authenticated` 120/60s, `authFailure` 10/60s, `mutation`
+30/60s, `queueDrain` 4/60s.
 Responses carry `cache-control: no-store`, `nosniff`, `DENY`, `no-referrer` and HSTS. CORS is
 intentionally not enabled: only the dashboard server calls this API.
 
@@ -121,6 +131,28 @@ NODE
 Send those headers to `https://api.<domain>/v1/meta`. Replaying the same nonce returns 401; a
 timestamp older than 60 seconds returns 401; an unsigned request returns 401.
 
+## Config hot-reload
+
+`ConfigWatcher` holds a dedicated `pg` client connected to `DIRECT_URL ?? DATABASE_URL` (a pooled
+URL cannot hold `LISTEN`). A validated `nujum_config` notification is treated as a **signal only**:
+the bot compares the payload version with the cached version and re-reads configuration from
+PostgreSQL, so stale or out-of-order notifications cannot roll settings back. A 10-second poll
+fallback covers missed notifications, and a failed `LISTEN` logs a warning without blocking gateway
+startup. On reload the `client.security`, `client.verification` and `client.modules` caches are
+cleared; no restart is required.
+
+The payload shape and write helper live in `@nujum/shared/config`; writes happen inside the
+caller's Prisma transaction using bound parameters.
+
+## Offline action queue
+
+When the dashboard cannot reach the bot it stores a zod-validated `PendingBotAction` (never code)
+and shows a "queued" state. On `ready` the bot calls `DatabaseQueueService.drain()`: rows are claimed
+with `FOR UPDATE SKIP LOCKED`, revalidated against current zod contracts, checked against Discord
+state again, and marked `COMPLETED`/`FAILED` with an error and attempt count. A 404 on the target
+message/channel is treated as idempotent success. The dashboard can also request a drain via
+`POST /v1/queue/drain` and cancel entries that are still `PENDING`.
+
 ## Local development
 
 ```bash
@@ -134,8 +166,9 @@ pnpm --filter @nujum/bot dev              # tsx watch, pretty logs
 - `pnpm --filter @nujum/bot build && pnpm --filter @nujum/bot start`
 - `SHARD_COUNT>1` requires a compiled build: `pnpm --filter @nujum/bot start:sharded`.
 
-Phase 2 does not read or write application tables yet. `DATABASE_URL` is validated at boot and
-`/readyz` performs a lightweight `SELECT 1`, so misconfiguration is caught before Phase 3.
+The bot now reads configuration and writes audit rows through Prisma. `/readyz` performs a
+lightweight `SELECT 1`, so credentials or network problems are caught before commands execute. If
+`LISTEN/NOTIFY` is unavailable, the watcher keeps working through the 10-second poll fallback.
 
 ## Docker deployment (Oracle Cloud VPS)
 
@@ -176,18 +209,19 @@ Oracle Cloud: allow inbound TCP 80/443 in the VCN security list **and** the inst
 - `/readyz` returning 503 means the database or gateway is down; `/healthz` stays 200 while the
   process is alive (useful for liveness probes that should not flap on a Discord outage).
 
-## Tests in this phase (54)
+## Tests (90 bot tests + 82 shared tests)
 
-| File                      | Covers                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `config/env.test.ts`      | defaults, CSV parsing, missing token, weak secret, bad CIDRs/shard ids.                                |
-| `lib/ip.test.ts`          | IPv4/IPv6 parsing, IPv4-mapped addresses, CIDR masking, allowlist.                                     |
-| `lib/components.test.ts`  | custom id round-trip, length/namespace/tamper rejection, ownership.                                    |
-| `lib/cooldowns.test.ts`   | cooldown expiry, per-user/guild/global rate-limit isolation.                                           |
-| `lib/loader.test.ts`      | recursive loading, support-file skipping, loud failure on bad exports.                                 |
-| `lib/permissions.test.ts` | full shared→discord.js permission mapping, no missing flags.                                           |
-| `commands.test.ts`        | manifest parity with the shared registry, valid Discord JSON, invite URL never requests Administrator. |
-| `api/server.test.ts`      | health/readiness, unsigned/replayed/wrong-path requests, malformed JSON, 404, IP allowlist.            |
+| File                      | Covers                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `config/env.test.ts`      | defaults, CSV parsing, missing token, weak secret, bad CIDRs/shard ids.                                                       |
+| `lib/ip.test.ts`          | IPv4/IPv6 parsing, IPv4-mapped addresses, CIDR masking, allowlist.                                                            |
+| `lib/components.test.ts`  | custom id round-trip, length/namespace/tamper rejection, ownership.                                                           |
+| `lib/cooldowns.test.ts`   | cooldown expiry, per-user/guild/global rate-limit isolation.                                                                  |
+| `lib/loader.test.ts`      | recursive loading, support-file skipping, loud failure on bad exports.                                                        |
+| `lib/permissions.test.ts` | full shared→discord.js permission mapping, no missing flags.                                                                  |
+| `commands.test.ts`        | manifest parity with the shared registry, valid Discord JSON, invite URL never requests Administrator.                        |
+| `api/server.test.ts`      | health/readiness, unsigned/replayed/wrong-path requests, malformed JSON, 404, IP allowlist, all live routes and actor checks. |
+| `config/watcher.test.ts`  | version comparison, stale notifications, poll fallback, DB failure isolation.                                                 |
 
 Run everything:
 
@@ -195,8 +229,16 @@ Run everything:
 pnpm typecheck && pnpm test && pnpm lint && pnpm build
 ```
 
-## Next phase
+## Dashboard smoke test
 
-Phase 3 adds the security layer (anti-raid, anti-nuke, anti-spam, anti-phishing, verification and
-audit logging) on top of these primitives. The API gains live action routes in Phase 4; the
-dashboard client and offline queue follow in Phase 5+.
+With a real database, a Discord OAuth app and matching `BOT_API_HMAC_SECRET` in both apps:
+
+1. Sign in at `/login` and open a server you own or manage.
+2. Change a security setting and save. The audit log shows a before/after diff; the bot reloads the
+   config in seconds with no restart.
+3. Stop the bot container and send a message from **Live actions**. The UI reports `QUEUED` and the
+   **Queue** page lists the entry.
+4. Restart the bot. The queue drains automatically; the entry disappears and Discord shows the
+   message.
+5. Publish the verification panel and toggle lockdown the same way; both are permission-checked at
+   execution time.

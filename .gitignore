@@ -10,6 +10,7 @@ out/
 *.tsbuildinfo
 
 # generated
+next-env.d.ts
 packages/shared/generated/
 coverage/
 playwright-report/

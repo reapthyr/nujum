@@ -95,21 +95,36 @@ cooldowns/rate limits, loader safety, permission mapping, command-manifest parit
   hashing, alert throttling, lockdown restore/retry and command-manifest parity. See
   [docs/security.md](docs/security.md).
 
-### Phase 4 — Bot API
+### Phase 4 — Bot API, config bus and dashboard (implemented)
 
-- HMAC on every route, optional CIDR allowlist, strict per-route rate limits.
-- zod validation on params, query and body; no wildcard CORS; no secrets in responses.
-- Request IDs and structured error envelopes.
+- HMAC on every `/v1` route, optional CIDR allowlist, strict per-route rate limits (120/60s
+  authenticated, 10/60s auth failures, 30/60s mutations, 4/60s queue drains).
+- zod validation on params, query, body and every queued payload; no wildcard CORS; no secrets in
+  responses; request IDs and structured error envelopes.
+- Mutations require a valid snowflake actor id and re-check guild membership, channel type and bot
+  permissions immediately before acting. Mentions stay neutralized (`parse: []`).
+- Config writes happen in one transaction with the version bump, `pg_notify` and audit entry. The bot
+  treats notifications as signals, compares versions and re-reads from the database; polling covers
+  missed notifications and a failed `LISTEN` cannot block gateway startup.
+- Offline actions are stored as validated data, revalidated on drain and claimed with
+  `FOR UPDATE SKIP LOCKED`; 404s are idempotent successes.
 
-### Phase 5+ — dashboard
+### Phase 5 — dashboard security (implemented)
 
-- Auth.js v5 database sessions, httpOnly/secure/sameSite cookies, 8h lifetime, 15m rotation.
-- Server-side authorization on every request; global owner area gated by `OWNER_IDS`.
-- CSRF protection on mutations (Auth.js + origin checks + double-submit for route handlers).
-- CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy via `next.config.ts`.
-- Upstash rate limiting (in-memory fallback in development).
-- Re-authentication for dangerous actions when the session is older than 15 minutes.
-- Full audit log with diff view and revert.
+- Auth.js v5 Discord OAuth with exactly `identify guilds`, database sessions, httpOnly/secure/sameSite
+  cookies, 8h lifetime, 15m rolling updates and a Discord blacklist check on sign-in and every
+  request.
+- `requireGuildAccess` re-verifies session, Discord guild membership and owner / `Administrator` /
+  `Manage Guild` / `DASHBOARD_OWNER_IDS` on every page and server action; the `Guild` row is upserted
+  so foreign keys stay valid.
+- Origin guard on mutations (against `NEXT_PUBLIC_APP_URL` / `AUTH_URL`) plus per-operation rate
+  limits; OAuth tokens and HMAC secrets never cross to client components.
+- HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy and Permissions-Policy via
+  `next.config.ts`; source maps disabled in production.
+- Sensitive actions require a Discord identity check within `REAUTH_WINDOW_MINUTES` (default 15);
+  a completed OAuth flow refreshes the stamp for all of that user's sessions.
+- Full audit log with before/after diff, actor metadata and one-transaction revert for config changes;
+  errors returned to the browser are generic and never contain stack traces or database details.
 
 ### Phase 14 — operations
 

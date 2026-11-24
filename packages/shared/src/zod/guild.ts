@@ -34,6 +34,8 @@ export const moduleSettingsSchema = z.object({
   settings: jsonObjectSchema.default({}),
 });
 
+export type ModuleSettingsInput = z.infer<typeof moduleSettingsSchema>;
+
 export const guildIdParamSchema = z.object({
   guildId: snowflakeSchema,
 });

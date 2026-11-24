@@ -9,6 +9,8 @@ export interface ApiRateRule {
 export const API_RATE_RULES = {
   authenticated: { capacity: 120, windowMs: 60_000 },
   authFailure: { capacity: 10, windowMs: 60_000 },
+  mutation: { capacity: 30, windowMs: 60_000 },
+  queueDrain: { capacity: 4, windowMs: 60_000 },
 } as const satisfies Record<string, ApiRateRule>;
 
 export interface ApiRateVerdict {

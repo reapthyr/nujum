@@ -108,7 +108,13 @@ Bot behavior:
 5. On reconnect or startup, all guilds are loaded and stale entries discarded.
 
 The notification payload is a _signal_, never the config itself. The bot always re-reads from the
-database, so a lost or duplicated notification is harmless.
+database, so a lost or duplicated notification is harmless. A failed `LISTEN` is logged and the
+bot continues with polling only — the gateway never waits on the listener.
+
+The shared writer is `notifyConfigChange(tx, payload)` in `@nujum/shared/config`; the dashboard
+calls it inside the same Prisma transaction as the config upsert, `configVersion` bump and
+`AuditLog` row. Reverting an audit entry runs the inverse write through the same path, so a revert
+also hot-reloads.
 
 ---
 
@@ -132,6 +138,11 @@ database, so a lost or duplicated notification is harmless.
 
 Both are idempotent at the handler level (Discord 404/unknown-member is treated as success) so
 at-least-once delivery is safe.
+
+`PendingBotAction.payload` is validated with `queuedBotActionSchema` on write **and** again on drain:
+a stale or hand-edited row is marked `FAILED` with `lastError` instead of being executed. The bot
+claims a bounded batch with `FOR UPDATE SKIP LOCKED`, so multiple bot processes/shards never execute
+the same action. Users can cancel entries that are still `PENDING` from the dashboard queue page.
 
 ---
 
