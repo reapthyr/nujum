@@ -83,7 +83,9 @@ CI runs the same gates (`.github/workflows/ci.yml`). Do not deploy a commit that
    Copy the token and application ID into `apps/bot/.env`.
 2. Enable only the gateway intents the bot needs (guilds, guild members, guild messages, message
    content, voice states, reactions as documented in [bot.md](bot.md)).
-3. OAuth2 → Redirects: add `<NEXT_PUBLIC_APP_URL>/api/auth/callback/discord`.
+3. OAuth2 → Redirects: add the exact production callback
+   `https://nujum-tau.vercel.app/api/auth/callback/discord`. For local development also add
+   `http://localhost:3000/api/auth/callback/discord`.
 4. OAuth2 → Scopes: the dashboard requests exactly `identify guilds` — no other scopes.
 5. Once commands are registered (§3.6), invite the bot with the URL produced by `/invite`. It uses
    the exact non-Administrator permission bitfield derived from the command registry.
@@ -214,9 +216,9 @@ sudo journalctl -u nujum-bot -f
    | `AUTH_SECRET`                                            | `openssl rand -base64 48`                                   |
    | `AUTH_DISCORD_ID`                                        | Discord application ID                                      |
    | `AUTH_DISCORD_SECRET`                                    | Discord OAuth client secret                                 |
-   | `NEXT_PUBLIC_APP_URL`                                    | `https://dashboard.example.com`, no trailing slash          |
-   | `AUTH_URL`                                               | optional; defaults to `NEXT_PUBLIC_APP_URL`                 |
-   | `BOT_API_URL`                                            | `https://api.example.com` (Caddy origin, no trailing slash) |
+   | `NEXT_PUBLIC_APP_URL`                                    | `https://nujum-tau.vercel.app`, no trailing slash          |
+   | `AUTH_URL`                                               | `https://nujum-tau.vercel.app`, no trailing slash          |
+   | `BOT_API_URL`                                            | `http://79.76.123.86:8080`, no trailing slash              |
    | `BOT_API_HMAC_SECRET`                                    | **identical** to the bot's secret                           |
    | `BOT_API_HMAC_SECRET_PREVIOUS`                           | only during rotation (§7)                                   |
    | `DASHBOARD_OWNER_IDS`                                    | comma-separated super-admin snowflakes                      |
