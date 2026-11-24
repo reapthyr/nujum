@@ -1,4 +1,4 @@
-import { PrismaClient } from "../generated/client";
+import { PrismaClient } from "@prisma/client";
 
 /**
  * Serverless-safe Prisma singleton.
@@ -43,5 +43,5 @@ export async function disconnectPrisma(): Promise<void> {
   globalForPrisma.__nujumPrisma = undefined;
 }
 
-export { Prisma } from "../generated/client";
-export type { PrismaClient } from "../generated/client";
+export { Prisma } from "@prisma/client";
+export type { PrismaClient } from "@prisma/client";

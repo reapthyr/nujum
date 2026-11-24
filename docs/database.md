@@ -60,8 +60,10 @@ Rules:
   (`.github/workflows/db-migrate.yml`) or run it manually against `DIRECT_URL`.
 - Schema changes are reviewed as SQL in the migration file, not only as a Prisma diff.
 - Migrations are forward-only; destructive changes require an explicit backup step.
-- The Prisma client is generated into `packages/shared/generated/client` and is git-ignored;
-  `postinstall` regenerates it for every install.
+- The Prisma client is generated into the default `@prisma/client` package (inside the
+  pnpm store) and is not committed; `postinstall` regenerates it for every install.
+  The generator includes `rhel-openssl-3.0.x` so Vercel's Linux functions get the
+  matching query engine.
 
 ### Generating a migration without a live database
 

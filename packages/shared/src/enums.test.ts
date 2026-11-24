@@ -23,7 +23,7 @@ import {
   TicketStatus as PTicketStatus,
   VerificationMode as PVerificationMode,
   WhitelistType as PWhitelistType,
-} from "../generated/client";
+} from "@prisma/client";
 import {
   ACTOR_TYPES,
   APPEAL_STATUSES,
