@@ -3,6 +3,7 @@ import {
   assertGuildAccess,
   canManageGuild,
   isSuperAdmin,
+  parseDiscordGuilds,
   parsePermissionBits,
   type DiscordGuildSummary,
 } from "./discord";
@@ -36,5 +37,27 @@ describe("Discord authorization", () => {
   it("treats configured owner ids as an exact match", () => {
     expect(isSuperAdmin("123456789012345678", ["1234567890123456789"])).toBe(false);
     expect(isSuperAdmin("123456789012345678", ["123456789012345678"])).toBe(true);
+  });
+
+  it("parses /users/@me/guilds responses that omit owner_id", () => {
+    const parsed = parseDiscordGuilds([
+      {
+        id: "123456789012345678",
+        name: "Example",
+        icon: null,
+        owner: true,
+        permissions: "8",
+      },
+    ]);
+    expect(parsed).toEqual([
+      {
+        id: "123456789012345678",
+        name: "Example",
+        icon: null,
+        owner: true,
+        ownerId: "",
+        permissions: "8",
+      },
+    ]);
   });
 });

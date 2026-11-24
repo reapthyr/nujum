@@ -13,7 +13,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
   if (!session?.user?.id || session.user.isBlacklisted) redirect("/login");
 
-  const guilds = await listDiscordGuilds(session).catch(() => []);
+  const guilds = await listDiscordGuilds(session).catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error("Failed to list Discord guilds:", error instanceof Error ? error.message : error);
+    return [];
+  });
   const superAdmin = isSuperAdmin(session.user.discordId, getEnv().DASHBOARD_OWNER_IDS);
 
   return (

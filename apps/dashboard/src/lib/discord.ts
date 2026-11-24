@@ -21,8 +21,10 @@ const discordGuildSchema = z.object({
   id: z.string().regex(/^\d{16,20}$/),
   name: z.string().min(1).max(100),
   icon: z.string().nullable().optional(),
+  // /users/@me/guilds returns `owner` but not `owner_id`; only the guild
+  // detail endpoint has the latter, so keep it optional here.
   owner: z.boolean().optional(),
-  owner_id: z.string().regex(/^\d{16,20}$/),
+  owner_id: z.string().optional().default(""),
   permissions: z.string().regex(/^\d+$/),
 });
 
@@ -119,6 +121,21 @@ async function discordAccount(userId: string, discordId: string): Promise<string
   return refreshed.data.access_token;
 }
 
+export function parseDiscordGuilds(raw: unknown): DiscordGuildSummary[] {
+  const parsed = z.array(discordGuildSchema).safeParse(raw);
+  if (!parsed.success) {
+    throw new SecurityError("Discord returned an invalid guild list.", "FORBIDDEN");
+  }
+  return parsed.data.map((guild) => ({
+    id: guild.id,
+    name: guild.name,
+    icon: guild.icon ?? null,
+    owner: guild.owner ?? false,
+    ownerId: guild.owner_id,
+    permissions: guild.permissions,
+  }));
+}
+
 export async function listDiscordGuilds(session: Session): Promise<DiscordGuildSummary[]> {
   const token = await discordAccount(session.user.id, session.user.discordId);
   const response = await fetch("https://discord.com/api/v10/users/@me/guilds?limit=200", {
@@ -132,17 +149,5 @@ export async function listDiscordGuilds(session: Session): Promise<DiscordGuildS
       "FORBIDDEN",
     );
   }
-  const raw: unknown = await response.json();
-  const parsed = z.array(discordGuildSchema).safeParse(raw);
-  if (!parsed.success) {
-    throw new SecurityError("Discord returned an invalid guild list.", "FORBIDDEN");
-  }
-  return parsed.data.map((guild) => ({
-    id: guild.id,
-    name: guild.name,
-    icon: guild.icon ?? null,
-    owner: guild.owner ?? false,
-    ownerId: guild.owner_id,
-    permissions: guild.permissions,
-  }));
+  return parseDiscordGuilds(await response.json());
 }
