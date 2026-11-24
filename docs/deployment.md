@@ -52,11 +52,15 @@ CI runs the same gates (`.github/workflows/ci.yml`). Do not deploy a commit that
 
 ## 1. Database
 
-1. Create a hosted PostgreSQL 15+ database (Neon recommended) in a region near the VPS. Full details
+1. Create a hosted PostgreSQL 15+ database (Supabase or Neon) in a region near the VPS. Full details
    are in [database.md §1](database.md#1-provisioning-neon).
-2. Use the **pooled** URL for `DATABASE_URL` (`?sslmode=require&pgbouncer=true&connection_limit=1`
-   on Vercel) and the **direct** URL for `DIRECT_URL`.
-3. Apply migrations from a trusted machine or CI — never from the Vercel runtime:
+2. Use the **pooled** URL for `DATABASE_URL` (`?pgbouncer=true&connection_limit=1`) and the
+   **direct** URL for `DIRECT_URL`. Supabase transaction poolers use `aws-1-<REGION>.pooler.supabase.com`
+   on port `6543` with user `postgres.<PROJECT_REF>`. URL-encode special characters in the password
+   (e.g. `@` becomes `%40`). If the direct host is IPv6-only and the VPS has no IPv6 route, point the
+   bot's `DIRECT_URL` at the pooler too — `LISTEN/NOTIFY` will fall back to the 10-second poll.
+3. Apply migrations from a trusted machine or CI — never from the Vercel runtime.
+   Run them from the VPS if the local machine cannot reach the database:
 
    ```bash
    DIRECT_URL='postgresql://...' DATABASE_URL='postgresql://...' pnpm db:deploy

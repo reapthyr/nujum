@@ -1,57 +1,42 @@
-=== VERCEL ENVIRONMENT VARIABLES (set these in Vercel dashboard: Settings → Environment Variables) ===
+=== VERCEL ENVIRONMENT VARIABLES ===
+Set these in Vercel: Project -> Settings -> Environment Variables -> Production
+(Use `vercel deploy --prod` if the variables are Production-only.)
 
-DATABASE_URL    = postgresql://postgres:YOUR_SUPABASE_PASSWORD@db.yourproject.supabase.com:5432/postgres?sslmode=require&pgbouncer=true&connection_limit=1
-DIRECT_URL      = postgresql://postgres:YOUR_SUPABASE_PASSWORD@db.yourproject.supabase.com:5432/postgres
-AUTH_SECRET     = openssl rand -base64 48    # generate on your computer, copy the result
-AUTH_DISCORD_ID = YOUR_DISCORD_CLIENT_ID     # from Discord Dev portal
-AUTH_DISCORD_SECRET = YOUR_DISCORD_CLIENT_SECRET   # from Discord Dev portal
-NEXT_PUBLIC_APP_URL = http://localhost:3000   # or your deployed URL
-BOT_API_URL     = http://YOUR_VPS_IP:8080    # your VPS IP address
-BOT_API_HMAC_SECRET = YOUR_64_CHAR_HEX_HERE  # MUST match bot .env and shared .env exactly
-DASHBOARD_OWNER_IDS = YOUR_DISCORD_USER_ID   # your Discord user snowflake
+DATABASE_URL    = postgresql://postgres.<PROJECT_REF>:<PASSWORD_URL_ENCODED>@aws-1-<REGION>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+DIRECT_URL      = postgresql://postgres:<PASSWORD_URL_ENCODED>@db.<PROJECT_REF>.supabase.co:5432/postgres?sslmode=require
+AUTH_SECRET     = base64 string (openssl rand -base64 48)
+AUTH_DISCORD_ID = Discord application ID
+AUTH_DISCORD_SECRET = Discord OAuth client secret
+NEXT_PUBLIC_APP_URL = https://<your-vercel-domain>   # no trailing slash
+BOT_API_URL     = http://<VPS_PUBLIC_IP>:8080
+BOT_API_HMAC_SECRET = 64 hex chars (openssl rand -hex 32) -- MUST match bot/shared .env
+DASHBOARD_OWNER_IDS = comma-separated Discord user IDs
 SESSION_MAX_AGE_SECONDS = 28800
 SESSION_UPDATE_AGE_SECONDS = 900
 REAUTH_WINDOW_MINUTES = 15
 DASHBOARD_RATE_LIMIT = 120
 
-=== WHAT YOU NEED TO GENERATE (run these on YOUR computer) ===
+IMPORTANT: if the database password contains special characters, URL-encode them.
+Example: password `abc@def` must be written as `abc%40def` inside the URL.
 
-1. HMAC secret (64 hex chars):  Open PowerShell → run: openssl rand -hex 32
-   Copy the 64-character output → paste into:
-   - apps/bot/.env   (replace YOUR_64_CHAR_HEX_HERE)
-   - packages/shared/.env (replace YOUR_64_CHAR_HEX_HERE)
-   - Vercel env BOT_API_HMAC_SECRET
+=== VPS (direct Node.js, no Docker) ===
+1. Clone: sudo git clone https://github.com/reapthyr/nujum.git /opt/nujum
+2. Env files: apps/bot/.env and packages/shared/.env (chmod 600)
+3. Build (raise heap on small instances):
+   cd /opt/nujum
+   export NODE_OPTIONS="--max-old-space-size=1024"
+   pnpm install --frozen-lockfile
+   pnpm --filter @nujum/shared build
+   pnpm --filter @nujum/bot build
+4. systemd service runs: node /opt/nujum/apps/bot/dist/index.js
+   sudo systemctl enable --now nujum-bot
+5. Open TCP 8080 in BOTH Oracle Cloud security list and the OS firewall.
+6. Healthcheck: curl http://<VPS_PUBLIC_IP>:8080/healthz
 
-2. AUTH secret (base64 48 chars): Open PowerShell → run: openssl rand -base64 48
-   Copy the output → paste into:
-   - Vercel env AUTH_SECRET
+=== DATABASE MIGRATIONS ===
+Run from a machine that can reach the database (the VPS works well):
+   cd /opt/nujum
+   DIRECT_URL='<pooled-url>' pnpm --filter @nujum/shared db:deploy
 
-3. Discord values you need:
-   - Bot token: Discord Dev portal → Bot → Reset Token
-   - Client ID: Discord Dev portal → General Information → Application ID
-   - Client Secret: Discord Dev portal → General Information → Secret (if using OAuth)
-   - Your user ID: Right-click your Discord avatar → Copy ID
-
-=== FILES I've CREATED for you (just open and replace the placeholder text) ===
-
-1. apps/bot/.env    → Open in Notepad, replace "YOUR_DISCORD_TOKEN_HERE", "YOUR_DISCORD_CLIENT_ID", "YOUR_DISCORD_USER_ID", "YOUR_SUPABASE_PASSWORD", "YOUR_64_CHAR_HEX_HERE"
-
-2. packages/shared/.env → Open in Notepad, replace "YOUR_SUPABASE_PASSWORD", "YOUR_64_CHAR_HEX_HERE"
-
-3. Upload these files to your VPS and Vercel, then set the remaining Vercel env vars from the list above.
-
-=== TO RUN THE BOT LOCALLY (after uploading files) ===
-
-On your VPS (after uploading .env):
-1. cd /opt/nujum
-2. pnpm install --frozen-lockfile
-3. pnpm build
-4. node dist/index.js
-
-Test: curl http://YOUR_VPS_IP:8080/healthz
-
-=== DASHBOARD WILL WORK AFTER:
-- Files uploaded to Vercel
-- Vercel env vars set (from the text file above)
-- Bot running on VPS
-- Visit your Vercel URL → Login with Discord
+=== REFERENCE ===
+Full runbook: docs/deployment.md
