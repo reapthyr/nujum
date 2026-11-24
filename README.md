@@ -77,7 +77,7 @@ nujum/
 │  └─ dashboard/              # Phase 5+ (Next.js 15 on Vercel)
 ├─ packages/shared/
 │  ├─ prisma/
-│  │  ├─ schema.prisma        # 68 models, single source of truth
+│  │  ├─ schema.prisma        # 66 models, single source of truth
 │  │  └─ migrations/20261124000000_init/
 │  └─ src/
 │     ├─ constants.ts         # brand, enums mirrored for client safety, limits
@@ -186,7 +186,7 @@ unknown key id and secret rotation.
 
 ## Database
 
-The schema contains 68 models covering guilds, auth, audit, security, moderation, tickets,
+The schema contains 66 models covering guilds, auth, audit, security, moderation, tickets,
 join-to-create, welcome/verification, role panels, logging, leveling and community modules. See
 [`docs/database.md`](docs/database.md) for pooling, migrations, NOTIFY and retention.
 
