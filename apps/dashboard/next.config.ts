@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -20,6 +21,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  // Prisma generates its Linux query engine into the hoisted pnpm store.
+  // Trace from the monorepo root and include that native asset explicitly.
+  outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  outputFileTracingIncludes: {
+    "/*": [
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/libquery_engine-*.so.node",
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "128kb",
