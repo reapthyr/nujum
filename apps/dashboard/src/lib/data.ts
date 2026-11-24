@@ -183,7 +183,7 @@ export async function loadAuditLog(guildId: string): Promise<AuditView[]> {
   const rows = await getPrisma().auditLog.findMany({
     where: { guildId },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    take: 50,
   });
   return rows.map((row) => ({
     id: row.id,

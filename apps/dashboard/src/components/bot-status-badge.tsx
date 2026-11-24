@@ -15,7 +15,8 @@ export function BotStatusBadge({ guildId }: { guildId: string }) {
       });
       return (await response.json()) as BotResponse<BotMeta>;
     },
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   const online = data?.ok === true && data.data !== undefined;

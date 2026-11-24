@@ -74,7 +74,7 @@ export function AuditTable({ guildId, entries }: { guildId: string; entries: Aud
                   <p className="mb-3 text-xs text-muted">Reason: {entry.reason}</p>
                 ) : null}
                 <div className="space-y-1.5">
-                  {changes.slice(0, 40).map((change) => (
+                  {changes.slice(0, 20).map((change) => (
                     <div
                       key={change.path}
                       className="rounded-lg bg-background/50 px-3 py-2 text-xs"
