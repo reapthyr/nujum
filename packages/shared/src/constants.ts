@@ -216,6 +216,7 @@ export const BOT_ACTION_TYPES = [
   "SEND_MESSAGE",
   "ANNOUNCEMENT",
   "PUBLISH_VERIFICATION_PANEL",
+  "PUBLISH_TICKET_PANEL",
   "SET_LOCKDOWN",
 ] as const;
 
@@ -260,6 +261,14 @@ export const TICKET_DEFAULTS = {
   maxFormFields: 10,
   maxSupportRoles: 20,
   transcriptMaxBytes: 2_000_000,
+} as const;
+
+export const JTC_DEFAULTS = {
+  nameTemplate: "{username}'s Room",
+  defaultLimit: 0,
+  defaultBitrate: 64,
+  defaultRegion: "auto",
+  maxPresets: 10,
 } as const;
 
 export const MODERATION_DEFAULTS = {

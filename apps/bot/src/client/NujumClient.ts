@@ -12,6 +12,10 @@ import { NukeDetector } from "../security/nuke";
 import { SecurityThrottle } from "../security/throttle";
 import { VerificationService } from "../security/verification/service";
 import { ModuleService } from "../lib/modules";
+import { PrismaTicketRepository } from "../tickets/repository";
+import { TicketService } from "../tickets/service";
+import { PrismaJtcRepository } from "../jtc/repository";
+import { JtcService } from "../jtc/service";
 import { DiscordLiveActions } from "../api/live-actions";
 import { DatabaseQueueService } from "../api/queue";
 
@@ -71,6 +75,8 @@ export class NujumClient extends Client {
   readonly security: GuildSecurityService;
   readonly verification: VerificationService;
   readonly modules: ModuleService;
+  readonly tickets: TicketService;
+  readonly jtc: JtcService;
   readonly raidDetector = new RaidDetector();
   readonly spamDetector = new SpamDetector();
   readonly nukeDetector = new NukeDetector();
@@ -88,6 +94,10 @@ export class NujumClient extends Client {
     this.security = new GuildSecurityService(new PrismaSecurityRepository(), logger);
     this.verification = new VerificationService(logger);
     this.modules = new ModuleService(logger);
+    const audit = (entry: Parameters<typeof this.security.audit>[0]): Promise<void> =>
+      this.security.audit(entry);
+    this.tickets = new TicketService(new PrismaTicketRepository(), this.modules, audit, logger);
+    this.jtc = new JtcService(new PrismaJtcRepository(), this.modules, audit, logger);
     this.liveActions = new DiscordLiveActions(this, logger);
     this.queue = new DatabaseQueueService(this.liveActions, logger);
   }

@@ -6,6 +6,7 @@ import {
   optionalSnowflakeSchema,
   paginationSchema,
   shortTextSchema,
+  idArraySchema,
   snowflakeArraySchema,
   snowflakeSchema,
   zEnum,
@@ -29,30 +30,33 @@ export const ticketFormFieldSchema = z
     { message: "minLength must be less than or equal to maxLength", path: ["minLength"] },
   );
 
-export const ticketCategoryInputSchema = z
-  .object({
-    name: z
-      .string()
-      .min(1)
-      .max(80)
-      .transform((value) => value.trim()),
-    emoji: z.string().max(64).nullable().optional(),
-    description: z.string().max(200).nullable().optional(),
-    discordCategoryId: optionalSnowflakeSchema,
-    supportRoleIds: snowflakeArraySchema(TICKET_DEFAULTS.maxSupportRoles),
-    formFields: z.array(ticketFormFieldSchema).max(TICKET_DEFAULTS.maxFormFields),
-    position: z.number().int().min(0).max(100).default(0),
-    enabled: z.boolean().default(true),
-  })
-  .superRefine((value, ctx) => {
-    if (new Set(value.formFields.map((field) => field.key)).size !== value.formFields.length) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["formFields"],
-        message: "form field keys must be unique",
-      });
-    }
-  });
+const ticketCategoryShape = {
+  name: z
+    .string()
+    .min(1)
+    .max(80)
+    .transform((value) => value.trim()),
+  emoji: z.string().max(64).nullable().optional(),
+  description: z.string().max(200).nullable().optional(),
+  discordCategoryId: optionalSnowflakeSchema,
+  supportRoleIds: snowflakeArraySchema(TICKET_DEFAULTS.maxSupportRoles),
+  formFields: z.array(ticketFormFieldSchema).max(TICKET_DEFAULTS.maxFormFields),
+  position: z.number().int().min(0).max(100).default(0),
+  enabled: z.boolean().default(true),
+} as const;
+
+function assertUniqueFieldKeys(
+  value: { formFields: readonly { key: string }[] },
+  ctx: z.RefinementCtx,
+): void {
+  if (new Set(value.formFields.map((field) => field.key)).size !== value.formFields.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["formFields"],
+      message: "form field keys must be unique",
+    });
+  }
+}
 
 export const ticketConfigSchema = z.object({
   enabled: z.boolean(),
@@ -72,11 +76,23 @@ export const ticketConfigSchema = z.object({
   ratingEnabled: z.boolean(),
 });
 
+export const ticketCategoryInputSchema = z
+  .object(ticketCategoryShape)
+  .superRefine(assertUniqueFieldKeys);
+
+const ticketCategoryIdSchema = z.string().min(1).max(64);
+
+export const ticketCategoryCreateInputSchema = ticketCategoryInputSchema;
+export const ticketCategoryUpdateInputSchema = z
+  .object({ ...ticketCategoryShape, id: ticketCategoryIdSchema })
+  .superRefine(assertUniqueFieldKeys);
+export const ticketCategoryDeleteInputSchema = z.object({ id: ticketCategoryIdSchema });
+
 export const ticketPanelInputSchema = z.object({
   channelId: snowflakeSchema,
   type: zEnum(PANEL_TYPES),
   embed: embedSchema,
-  categoryIds: snowflakeArraySchema(TICKET_DEFAULTS.maxCategories, 1),
+  categoryIds: idArraySchema(TICKET_DEFAULTS.maxCategories, 1),
 });
 
 export const TICKET_ACTIONS = [
@@ -159,3 +175,8 @@ export const ticketQuerySchema = paginationSchema.extend({
   priority: zEnum(TICKET_PRIORITIES).optional(),
   q: z.string().max(100).optional(),
 });
+
+export type TicketConfigInput = z.infer<typeof ticketConfigSchema>;
+export type TicketCategoryInput = z.infer<typeof ticketCategoryInputSchema>;
+export type TicketCategoryUpdateInput = z.infer<typeof ticketCategoryUpdateInputSchema>;
+export type TicketPanelInput = z.infer<typeof ticketPanelInputSchema>;

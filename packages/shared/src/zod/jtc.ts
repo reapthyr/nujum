@@ -91,3 +91,6 @@ export const jtcActionSchema = z
       });
     }
   });
+
+export type JtcConfigInput = z.infer<typeof jtcConfigSchema>;
+export type JtcPresetInput = z.infer<typeof jtcPresetSchema>;

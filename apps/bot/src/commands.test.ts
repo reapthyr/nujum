@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { COMMANDS, getCommandDefinition } from "@nujum/shared";
 import { command as security } from "./commands/configuration/security";
+import { command as jtc } from "./commands/community/jtc";
+import { command as panel } from "./commands/tickets/panel";
+import { command as ticket } from "./commands/tickets/ticket";
 import { command as botinfo } from "./commands/utility/botinfo";
 import { command as help } from "./commands/utility/help";
 import {
@@ -11,7 +14,7 @@ import {
 import { command as ping } from "./commands/utility/ping";
 import { command as support } from "./commands/utility/support";
 
-const commands = [ping, help, botinfo, invite, support, security];
+const commands = [ping, help, botinfo, invite, support, security, ticket, panel, jtc];
 
 describe("command manifest", () => {
   it("has unique names bound to shared definitions", () => {

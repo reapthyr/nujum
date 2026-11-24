@@ -11,6 +11,7 @@ import {
   announcementBodySchema,
   guildPathParamsSchema,
   lockdownBodySchema,
+  publishTicketPanelBodySchema,
   publishVerificationBodySchema,
   queueDrainBodySchema,
   sendMessageBodySchema,
@@ -287,6 +288,18 @@ export async function createApiServer(deps: ApiDependencies) {
         const data = await services.actions.publishVerificationPanel(
           params.guildId,
           body,
+          actorFrom(request),
+        );
+        return { data, requestId: request.id };
+      });
+
+      scope.post("/guilds/:guildId/panels/tickets", async (request) => {
+        enforceMutationLimit(request.ip);
+        const params = parseRequest(guildPathParamsSchema, request.params);
+        const body = parseRequest(publishTicketPanelBodySchema, request.body);
+        const data = await services.actions.publishTicketPanel(
+          params.guildId,
+          { channelId: body.channelId, preview: false },
           actorFrom(request),
         );
         return { data, requestId: request.id };

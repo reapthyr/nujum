@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { FileClock, ListChecks, RadioTower, ShieldAlert, Sparkles } from "lucide-react";
+import {
+  FileClock,
+  ListChecks,
+  Mic2,
+  RadioTower,
+  ShieldAlert,
+  Sparkles,
+  Ticket,
+} from "lucide-react";
 import { requireGuildAccess } from "../../../lib/authz";
 import { createBotClient } from "../../../lib/bot-client";
 import { loadOverviewStats } from "../../../lib/data";
@@ -66,11 +74,13 @@ export default async function GuildOverviewPage({
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard label="Enabled modules" value={stats.modules} icon={<Sparkles />} />
         <StatCard label="Open threats" value={stats.threats} icon={<ShieldAlert />} />
         <StatCard label="Queued actions" value={stats.queueDepth} icon={<ListChecks />} />
         <StatCard label="Audit entries" value={stats.auditCount} icon={<FileClock />} />
+        <StatCard label="Open tickets" value={stats.openTickets} icon={<Ticket />} />
+        <StatCard label="JTC rooms" value={stats.jtcRooms} icon={<Mic2 />} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

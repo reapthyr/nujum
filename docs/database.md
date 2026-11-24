@@ -122,7 +122,11 @@ also hot-reloads.
 
 - Case numbers: `UPDATE "Guild" SET "caseCounter" = "caseCounter" + 1 ... RETURNING` inside the same
   transaction as the `ModCase` insert, unique on `(guildId, caseNumber)`.
-- Ticket numbers: same pattern with `ticketCounter` and unique `(guildId, number)`.
+- Ticket numbers: same pattern with `ticketCounter` and unique `(guildId, number)`. The Discord
+  channel is created before the transaction; if the insert fails, the channel is deleted so no
+  orphan ticket remains.
+- JTC rooms are soft-deleted (`deletedAt`) when the last member leaves or the Discord channel is
+  deleted. Rejoining the generator creates a fresh room and row.
 - Config writes, `configVersion` bump, notification and audit entry share one transaction.
 - Prisma parameterized queries only. Raw SQL is limited to `pg_notify` and
   `FOR UPDATE SKIP LOCKED` queue claims, both with bound parameters.
@@ -140,7 +144,9 @@ Both are idempotent at the handler level (Discord 404/unknown-member is treated 
 at-least-once delivery is safe.
 
 `PendingBotAction.payload` is validated with `queuedBotActionSchema` on write **and** again on drain:
-a stale or hand-edited row is marked `FAILED` with `lastError` instead of being executed. The bot
+a stale or hand-edited row is marked `FAILED` with `lastError` instead of being executed. Ticket
+panel publishing is included in that union as `PUBLISH_TICKET_PANEL`, so an offline panel publish is
+revalidated against the current config and Discord permissions before it runs. The bot
 claims a bounded batch with `FOR UPDATE SKIP LOCKED`, so multiple bot processes/shards never execute
 the same action. Users can cancel entries that are still `PENDING` from the dashboard queue page.
 

@@ -80,6 +80,13 @@ export class DatabaseQueueService implements QueueService {
           case "PUBLISH_VERIFICATION_PANEL":
             await this.actions.publishVerificationPanel(row.guildId, action.payload, row.createdBy);
             break;
+          case "PUBLISH_TICKET_PANEL":
+            await this.actions.publishTicketPanel(
+              row.guildId,
+              { channelId: action.payload.channelId, preview: false },
+              row.createdBy,
+            );
+            break;
           case "SET_LOCKDOWN":
             await this.actions.setLockdown(row.guildId, action.payload, row.createdBy);
             break;

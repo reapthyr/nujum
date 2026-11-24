@@ -107,6 +107,7 @@ export const lockdownBodySchema = lockdownSchema;
 
 export type SendMessageInput = z.infer<typeof sendMessageBodySchema>;
 export type AnnouncementInput = z.infer<typeof announcementBodySchema>;
+export type PublishTicketPanelInput = z.infer<typeof publishTicketPanelBodySchema>;
 export type PublishVerificationInput = z.infer<typeof publishVerificationBodySchema>;
 export type LockdownInput = z.infer<typeof lockdownBodySchema>;
 

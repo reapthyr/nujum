@@ -2,10 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  createTicketCategory,
+  deleteTicketCategory,
   getAuditContext,
   revertAuditEntry,
+  updateTicketCategory,
+  writeJtcConfig,
   writeModuleConfig,
   writeSecurityConfig,
+  writeTicketConfig,
   writeVerificationConfig,
   type ConfigWriteResult,
 } from "../../lib/config-writes";
@@ -16,6 +21,8 @@ import { assertSensitive } from "../../lib/session";
 function refresh(guildId: string): void {
   revalidatePath(`/dashboard/${guildId}`);
   revalidatePath(`/dashboard/${guildId}/audit`);
+  revalidatePath(`/dashboard/${guildId}/tickets`);
+  revalidatePath(`/dashboard/${guildId}/join-to-create`);
 }
 
 export async function saveSecurityConfig(
@@ -59,6 +66,81 @@ export async function saveModuleConfig(
     const ctx = await guardGuildAction(guildId, "module.save");
     await assertSensitive(ctx);
     const result = await writeModuleConfig(await getAuditContext(guildId, ctx.session), input);
+    refresh(guildId);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function saveTicketConfig(
+  guildId: string,
+  input: unknown,
+): Promise<ActionResult<ConfigWriteResult>> {
+  try {
+    const ctx = await guardGuildAction(guildId, "tickets.save");
+    await assertSensitive(ctx);
+    const result = await writeTicketConfig(await getAuditContext(guildId, ctx.session), input);
+    refresh(guildId);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function saveJtcConfig(
+  guildId: string,
+  input: unknown,
+): Promise<ActionResult<ConfigWriteResult>> {
+  try {
+    const ctx = await guardGuildAction(guildId, "jtc.save");
+    await assertSensitive(ctx);
+    const result = await writeJtcConfig(await getAuditContext(guildId, ctx.session), input);
+    refresh(guildId);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function createTicketCategoryAction(
+  guildId: string,
+  input: unknown,
+): Promise<ActionResult<ConfigWriteResult>> {
+  try {
+    const ctx = await guardGuildAction(guildId, "tickets.category.create");
+    await assertSensitive(ctx);
+    const result = await createTicketCategory(await getAuditContext(guildId, ctx.session), input);
+    refresh(guildId);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function updateTicketCategoryAction(
+  guildId: string,
+  input: unknown,
+): Promise<ActionResult<ConfigWriteResult>> {
+  try {
+    const ctx = await guardGuildAction(guildId, "tickets.category.update");
+    await assertSensitive(ctx);
+    const result = await updateTicketCategory(await getAuditContext(guildId, ctx.session), input);
+    refresh(guildId);
+    return { ok: true, data: result };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function deleteTicketCategoryAction(
+  guildId: string,
+  input: unknown,
+): Promise<ActionResult<ConfigWriteResult>> {
+  try {
+    const ctx = await guardGuildAction(guildId, "tickets.category.delete");
+    await assertSensitive(ctx);
+    const result = await deleteTicketCategory(await getAuditContext(guildId, ctx.session), input);
     refresh(guildId);
     return { ok: true, data: result };
   } catch (error) {

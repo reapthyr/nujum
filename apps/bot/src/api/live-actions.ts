@@ -11,6 +11,7 @@ import type {
   BotActionResult,
   BotGuildSnapshot,
   LockdownInput,
+  PublishTicketPanelInput,
   PublishVerificationInput,
   SendMessageInput,
 } from "@nujum/shared";
@@ -19,23 +20,14 @@ import { serializeError } from "../lib/errors";
 import type { BotLogger } from "../lib/logger";
 import { activateLockdown, deactivateLockdown } from "../security/lockdown";
 import { verificationPanel } from "../security/verification/views";
+import { ApiActionError } from "./errors";
+
+export { ApiActionError } from "./errors";
 
 /** Text-based guild channels that can actually send (excludes partial DMs). */
 interface SendableChannel {
   id: string;
   send(options: MessageCreateOptions): Promise<Message>;
-}
-
-export class ApiActionError extends Error {
-  constructor(
-    readonly code:
-      "BAD_REQUEST" | "FORBIDDEN" | "NOT_FOUND" | "GUILD_NOT_FOUND" | "RATE_LIMITED" | "INTERNAL",
-    message: string,
-    readonly statusCode: number = 400,
-  ) {
-    super(message);
-    this.name = "ApiActionError";
-  }
 }
 
 export interface LiveActions {
@@ -49,6 +41,11 @@ export interface LiveActions {
   publishVerificationPanel(
     guildId: string,
     input: PublishVerificationInput,
+    actorId: string,
+  ): Promise<BotActionResult>;
+  publishTicketPanel(
+    guildId: string,
+    input: PublishTicketPanelInput,
     actorId: string,
   ): Promise<BotActionResult>;
   setLockdown(guildId: string, input: LockdownInput, actorId: string): Promise<BotActionResult>;
@@ -259,6 +256,27 @@ export class DiscordLiveActions implements LiveActions {
         "verification panel publish failed",
       );
       throw new ApiActionError("INTERNAL", "Discord rejected the verification panel.", 502);
+    }
+  }
+
+  async publishTicketPanel(
+    guildId: string,
+    input: PublishTicketPanelInput,
+    actorId: string,
+  ): Promise<BotActionResult> {
+    const guild = await this.guild(guildId);
+    try {
+      // Dashboard actions are never previews: they publish to the stored panel.
+      return await this.client.tickets.publish(
+        guildId,
+        { channelId: input.channelId, preview: false },
+        actorId,
+        { guild },
+      );
+    } catch (error) {
+      if (error instanceof ApiActionError) throw error;
+      this.logger.error({ err: serializeError(error), guildId }, "ticket panel publish failed");
+      throw new ApiActionError("INTERNAL", "Ticket panel could not be published.", 502);
     }
   }
 

@@ -5,9 +5,11 @@ import {
   FileClock,
   LayoutDashboard,
   ListChecks,
+  Mic2,
   RadioTower,
   ShieldAlert,
   ShieldCheck,
+  Ticket,
   Blocks,
 } from "lucide-react";
 import { BotStatusBadge } from "../../../components/bot-status-badge";
@@ -19,6 +21,8 @@ const links = [
   { href: "/security", label: "Security", icon: ShieldAlert },
   { href: "/verification", label: "Verification", icon: ShieldCheck },
   { href: "/modules", label: "Modules", icon: Blocks },
+  { href: "/tickets", label: "Tickets", icon: Ticket },
+  { href: "/join-to-create", label: "Join to create", icon: Mic2 },
   { href: "/live", label: "Live actions", icon: RadioTower },
   { href: "/queue", label: "Queue", icon: ListChecks },
   { href: "/audit", label: "Audit log", icon: FileClock },

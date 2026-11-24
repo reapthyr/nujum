@@ -306,6 +306,16 @@ export const COMMANDS: readonly CommandDefinition[] = [
     cooldownMs: 10_000,
     rateLimit: HEAVY_RATE,
   }),
+  command({
+    name: "jtc",
+    description: "Manage your Join-to-Create room, preset and trusted members.",
+    category: "community",
+    scope: "guild",
+    userPermissions: [],
+    botPermissions: [...BASE_BOT, "ManageChannels", "MoveMembers", "Connect", "Speak"],
+    cooldownMs: 3_000,
+    rateLimit: DEFAULT_RATE,
+  }),
 
   // ── community ─────────────────────────────────────────────────────────────
   command({

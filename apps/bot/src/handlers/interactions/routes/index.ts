@@ -1,6 +1,23 @@
 import type { NujumClient } from "../../../client/NujumClient";
 import { helpRefreshButton } from "./help";
+import {
+  jtcClaimButton,
+  jtcHideButton,
+  jtcLimitSelect,
+  jtcLockButton,
+  jtcUnhideButton,
+  jtcUnlockButton,
+} from "./jtc";
 import { securityUnlockButton } from "./security";
+import {
+  ticketCallButton,
+  ticketClaimButton,
+  ticketCloseButton,
+  ticketRateButton,
+  ticketRatingModal,
+  ticketSelectMenu,
+  ticketStartButton,
+} from "./tickets";
 import { verificationCodeModal, verificationStartButton } from "./verification";
 import type { ButtonRoute, ModalRoute, SelectRoute } from "../types";
 
@@ -8,9 +25,19 @@ export const buttonRoutes: readonly ButtonRoute[] = [
   helpRefreshButton,
   securityUnlockButton,
   verificationStartButton,
+  ticketStartButton,
+  ticketCloseButton,
+  ticketClaimButton,
+  ticketCallButton,
+  ticketRateButton,
+  jtcLockButton,
+  jtcUnlockButton,
+  jtcHideButton,
+  jtcUnhideButton,
+  jtcClaimButton,
 ];
-export const selectRoutes: readonly SelectRoute[] = [];
-export const modalRoutes: readonly ModalRoute[] = [verificationCodeModal];
+export const selectRoutes: readonly SelectRoute[] = [ticketSelectMenu, jtcLimitSelect];
+export const modalRoutes: readonly ModalRoute[] = [verificationCodeModal, ticketRatingModal];
 
 export function registerInteractionRoutes(client: NujumClient): void {
   for (const route of buttonRoutes) {

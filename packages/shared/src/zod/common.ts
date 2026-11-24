@@ -100,6 +100,15 @@ export function snowflakeArraySchema(max = 50, min = 0) {
     .refine((values) => new Set(values).size === values.length, "duplicate ids are not allowed");
 }
 
+/** Opaque database ids (cuid/uuid), e.g. `TicketCategory.id`. */
+export function idArraySchema(max = 50, min = 0) {
+  return z
+    .array(z.string().min(1).max(64))
+    .min(min)
+    .max(max)
+    .refine((values) => new Set(values).size === values.length, "duplicate ids are not allowed");
+}
+
 export const paginationSchema = z.object({
   cursor: z.string().max(PAGINATION.maxCursorLength).optional(),
   limit: z.coerce.number().int().min(1).max(PAGINATION.maxLimit).default(PAGINATION.defaultLimit),

@@ -5,10 +5,19 @@ import {
   embedSchema,
   generalSettingsSchema,
   hexColorSchema,
+  jtcActionSchema,
+  jtcConfigSchema,
+  jtcPresetSchema,
   keywordSchema,
+  publishTicketPanelBodySchema,
+  queuedBotActionSchema,
   rolePanelInputSchema,
   securityConfigSchema,
   ticketActionSchema,
+  ticketCategoryCreateInputSchema,
+  ticketCategoryUpdateInputSchema,
+  ticketConfigSchema,
+  ticketPanelInputSchema,
 } from "./zod";
 
 describe("common schemas", () => {
@@ -101,6 +110,108 @@ describe("tickets", () => {
 
   it("allows closing without a reason", () => {
     expect(ticketActionSchema.parse({ action: "CLOSE" }).action).toBe("CLOSE");
+  });
+
+  it("requires {number} in the channel naming format", () => {
+    const base = {
+      enabled: true,
+      panelChannelId: null,
+      transcriptChannelId: null,
+      logChannelId: null,
+      supportRoleIds: [],
+      maxOpenPerUser: 1,
+      inactivityHours: 48,
+      warnBeforeHours: 6,
+      ratingEnabled: true,
+    };
+    expect(
+      ticketConfigSchema.parse({ ...base, namingFormat: "support-{number}" }).namingFormat,
+    ).toBe("support-{number}");
+    expect(() => ticketConfigSchema.parse({ ...base, namingFormat: "support" })).toThrow();
+  });
+
+  it("accepts cuid category ids and rejects duplicates", () => {
+    const panel = {
+      channelId: "123456789012345678",
+      type: "BUTTONS" as const,
+      embed: { title: "Support" },
+      categoryIds: ["clh1234567890abcdefghi", "clh9876543210abcdefghi"],
+    };
+    expect(ticketPanelInputSchema.parse(panel).categoryIds).toHaveLength(2);
+    expect(() =>
+      ticketPanelInputSchema.parse({
+        ...panel,
+        categoryIds: [panel.categoryIds[0], panel.categoryIds[0]],
+      }),
+    ).toThrow();
+  });
+
+  it("rejects duplicate form field keys in create and update input", () => {
+    const category = {
+      name: "General",
+      supportRoleIds: [],
+      formFields: [
+        { key: "topic", label: "Topic" },
+        { key: "topic", label: "Topic again" },
+      ],
+    };
+    expect(() => ticketCategoryCreateInputSchema.parse(category)).toThrow();
+    expect(() =>
+      ticketCategoryUpdateInputSchema.parse({
+        ...category,
+        id: "123456789012345678",
+        formFields: [{ key: "topic", label: "Topic" }],
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("join to create", () => {
+  const config = {
+    enabled: true,
+    generatorChannelId: "123456789012345678",
+    categoryId: "123456789012345679",
+    nameTemplate: "{username}'s room",
+    defaultLimit: 0,
+    defaultBitrate: 64,
+    defaultRegion: "auto",
+    panelChannelId: null,
+    interfaceChannelId: null,
+    trustedRoleIds: [],
+  };
+
+  it("requires {username} in the room name template", () => {
+    expect(jtcConfigSchema.parse(config).nameTemplate).toBe("{username}'s room");
+    expect(() => jtcConfigSchema.parse({ ...config, nameTemplate: "My room" })).toThrow();
+  });
+
+  it("bounds presets and rejects invalid regions", () => {
+    expect(jtcPresetSchema.parse({ name: "Quiet" }).bitrate).toBe(64);
+    expect(() => jtcPresetSchema.parse({ name: "Bad", bitrate: 500 })).toThrow();
+    expect(() => jtcPresetSchema.parse({ name: "Bad", region: "mars-1" })).toThrow();
+  });
+
+  it("requires a target for user actions and a value for numeric actions", () => {
+    expect(() => jtcActionSchema.parse({ action: "KICK" })).toThrow();
+    expect(() => jtcActionSchema.parse({ action: "LIMIT" })).toThrow();
+    expect(jtcActionSchema.parse({ action: "LIMIT", value: 5 }).value).toBe(5);
+  });
+});
+
+describe("dashboard live actions", () => {
+  it("queues ticket panel publishing with a validated payload", () => {
+    const body = publishTicketPanelBodySchema.parse({ channelId: "123456789012345678" });
+    const queued = queuedBotActionSchema.parse({
+      type: "PUBLISH_TICKET_PANEL",
+      payload: body,
+    });
+    expect(queued.type).toBe("PUBLISH_TICKET_PANEL");
+    expect(() =>
+      queuedBotActionSchema.parse({
+        type: "PUBLISH_TICKET_PANEL",
+        payload: { channelId: "not-a-snowflake" },
+      }),
+    ).toThrow();
   });
 });
 

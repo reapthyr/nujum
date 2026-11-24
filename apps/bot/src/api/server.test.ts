@@ -45,6 +45,7 @@ const snapshot: BotGuildSnapshot = {
 
 type TestServices = ApiServices & {
   sendMessage: ReturnType<typeof vi.fn>;
+  publishTicketPanel: ReturnType<typeof vi.fn>;
   drain: ReturnType<typeof vi.fn>;
 };
 
@@ -55,6 +56,9 @@ function services(): TestServices {
     messageId: "333333333333333333",
   };
   const sendMessage = vi.fn(() => Promise.resolve(result));
+  const publishTicketPanel = vi.fn(() =>
+    Promise.resolve({ ...result, type: "PUBLISH_TICKET_PANEL" as const }),
+  );
   const drain = vi.fn(() => Promise.resolve({ claimed: 1, sent: 1, failed: 0, skipped: 0 }));
   const actions: LiveActions = {
     snapshot: vi.fn(() => Promise.resolve(snapshot)),
@@ -63,13 +67,14 @@ function services(): TestServices {
     publishVerificationPanel: vi.fn(() =>
       Promise.resolve({ ...result, type: "PUBLISH_VERIFICATION_PANEL" as const }),
     ),
+    publishTicketPanel,
     setLockdown: vi.fn(() => Promise.resolve({ ...result, type: "SET_LOCKDOWN" as const })),
   };
   const queue: QueueService = {
     depth: vi.fn(() => Promise.resolve(3)),
     drain,
   };
-  return { actions, queue, sendMessage, drain };
+  return { actions, queue, sendMessage, publishTicketPanel, drain };
 }
 
 function signed(path = "/v1/meta") {
@@ -232,6 +237,24 @@ describe("internal API", () => {
     );
   });
 
+  it("publishes a ticket panel and forces non-preview API behaviour", async () => {
+    const path = `/v1/guilds/${GUILD}/panels/tickets`;
+    const body = { channelId: "111111111111111111", preview: true };
+    const response = await app.inject({
+      method: "POST",
+      url: path,
+      headers: signedPost(path, body),
+      payload: body,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ data: BotActionResult }>().data.type).toBe("PUBLISH_TICKET_PANEL");
+    expect(depsServices.publishTicketPanel).toHaveBeenCalledWith(
+      GUILD,
+      { channelId: "111111111111111111", preview: false },
+      ACTOR,
+    );
+  });
+
   it("rejects live mutations without a dashboard actor", async () => {
     const path = `/v1/guilds/${GUILD}/messages`;
     const body = { channelId: "111111111111111111", content: "hello" };
@@ -254,16 +277,32 @@ describe("internal API", () => {
   });
 
   it("drains the offline queue through a signed endpoint", async () => {
-    const path = "/v1/queue/drain";
-    const response = await app.inject({
-      method: "POST",
-      url: path,
-      headers: signedPost(path, { limit: 5 }),
-      payload: { limit: 5 },
+    // A fresh server gives this test its own rate-limit buckets; the shared
+    // `app` has already spent its auth-failure budget on negative-path tests.
+    const drainApp = await createApiServer({
+      env: envWith(),
+      logger,
+      client,
+      services: depsServices,
+      databaseHealthy: () => Promise.resolve(false),
+      startedAt: Date.now(),
+      version: "0.2.0-test",
     });
-    expect(response.statusCode).toBe(200);
-    expect(response.json<{ data: { sent: number } }>().data.sent).toBe(1);
-    expect(depsServices.drain).toHaveBeenCalledWith(5);
+    await drainApp.ready();
+    try {
+      const path = "/v1/queue/drain";
+      const response = await drainApp.inject({
+        method: "POST",
+        url: path,
+        headers: signedPost(path, { limit: 5 }),
+        payload: { limit: 5 },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<{ data: { sent: number } }>().data.sent).toBe(1);
+      expect(depsServices.drain).toHaveBeenCalledWith(5);
+    } finally {
+      await drainApp.close();
+    }
   });
 });
 

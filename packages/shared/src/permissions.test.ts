@@ -35,6 +35,7 @@ describe("command registry", () => {
 
   it("looks commands up by name", () => {
     expect(getCommandDefinition("ban")?.userPermissions).toContain("BanMembers");
+    expect(getCommandDefinition("jtc")?.botPermissions).toContain("ManageChannels");
     expect(getCommandDefinition("does-not-exist")).toBeUndefined();
   });
 });

@@ -10,6 +10,7 @@ import {
 import {
   announcementBodySchema,
   lockdownBodySchema,
+  publishTicketPanelBodySchema,
   publishVerificationBodySchema,
   sendMessageBodySchema,
 } from "./bot-api";
@@ -24,6 +25,10 @@ export const queuedBotActionSchema = z.union([
   z.object({
     type: z.literal("PUBLISH_VERIFICATION_PANEL"),
     payload: publishVerificationBodySchema,
+  }),
+  z.object({
+    type: z.literal("PUBLISH_TICKET_PANEL"),
+    payload: publishTicketPanelBodySchema,
   }),
   z.object({ type: z.literal("SET_LOCKDOWN"), payload: lockdownBodySchema }),
 ]);

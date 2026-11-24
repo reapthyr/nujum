@@ -14,7 +14,7 @@ apps/bot/
 │  ├─ api/                    # Fastify server, HMAC guard, live actions, queue drain
 │  ├─ config/                 # zod env contract + LISTEN/NOTIFY watcher
 │  ├─ client/                 # NujumClient + command/event auto-loading
-│  ├─ commands/               # ping, botinfo, help, invite, support
+│  ├─ commands/               # utility, configuration, tickets and community commands
 │  ├─ core/                   # process guards + graceful shutdown
 │  ├─ events/                 # ready, interactionCreate, guild*, error, warn, shard*
 │  ├─ handlers/               # command execution, component/modal routing
@@ -40,13 +40,16 @@ apps/bot/
 
 ## Commands in this phase
 
-| Command    | Scope | What it does                                                          |
-| ---------- | ----- | --------------------------------------------------------------------- |
-| `/ping`    | both  | Gateway + round-trip latency with a colour-coded status.              |
-| `/botinfo` | both  | Version, uptime, guild/user counts, shard, memory, Node/discord.js.   |
-| `/help`    | both  | Paginated command browser with a per-user refresh button.             |
-| `/invite`  | both  | Bot invite URL using the exact non-Administrator permission bitfield. |
-| `/support` | both  | Support server and documentation links.                               |
+| Command    | Scope | What it does                                                               |
+| ---------- | ----- | -------------------------------------------------------------------------- |
+| `/ping`    | both  | Gateway + round-trip latency with a colour-coded status.                   |
+| `/botinfo` | both  | Version, uptime, guild/user counts, shard, memory, Node/discord.js.        |
+| `/help`    | both  | Paginated command browser with a per-user refresh button.                  |
+| `/invite`  | both  | Bot invite URL using the exact non-Administrator permission bitfield.      |
+| `/support` | both  | Support server and documentation links.                                    |
+| `/ticket`  | guild | Ticket stats, close/claim, participant, rename, priority, note, blacklist. |
+| `/panel`   | guild | Publish or preview the stored ticket panel.                                |
+| `/jtc`     | guild | Join-to-Create presets, room controls, interface panel and stats.          |
 
 Register them after a build:
 
@@ -93,6 +96,7 @@ Validation rules worth knowing:
 | `POST /v1/guilds/:guildId/messages`            | HMAC | Send a message; `allowedMentions.parse` is always empty.                                 |
 | `POST /v1/guilds/:guildId/announcements`       | HMAC | `@everyone` announcement; requires explicit confirmation and bot permission.             |
 | `POST /v1/guilds/:guildId/panels/verification` | HMAC | Publish the verification panel to a re-checked channel.                                  |
+| `POST /v1/guilds/:guildId/panels/tickets`      | HMAC | Publish or refresh a ticket panel; safe to queue while the bot is offline.               |
 | `POST /v1/guilds/:guildId/lockdown`            | HMAC | Apply/clear lockdown with stored overwrites.                                             |
 | `POST /v1/queue/drain`                         | HMAC | Claim and drain pending dashboard actions with `FOR UPDATE SKIP LOCKED`.                 |
 
@@ -138,8 +142,8 @@ URL cannot hold `LISTEN`). A validated `nujum_config` notification is treated as
 the bot compares the payload version with the cached version and re-reads configuration from
 PostgreSQL, so stale or out-of-order notifications cannot roll settings back. A 10-second poll
 fallback covers missed notifications, and a failed `LISTEN` logs a warning without blocking gateway
-startup. On reload the `client.security`, `client.verification` and `client.modules` caches are
-cleared; no restart is required.
+startup. On reload the `client.security`, `client.verification`, `client.modules`, `client.tickets`
+and `client.jtc` caches are cleared; no restart is required.
 
 The payload shape and write helper live in `@nujum/shared/config`; writes happen inside the
 caller's Prisma transaction using bound parameters.
@@ -149,9 +153,33 @@ caller's Prisma transaction using bound parameters.
 When the dashboard cannot reach the bot it stores a zod-validated `PendingBotAction` (never code)
 and shows a "queued" state. On `ready` the bot calls `DatabaseQueueService.drain()`: rows are claimed
 with `FOR UPDATE SKIP LOCKED`, revalidated against current zod contracts, checked against Discord
-state again, and marked `COMPLETED`/`FAILED` with an error and attempt count. A 404 on the target
+state again, and marked `SENT`/`FAILED` with an error and attempt count. A 404 on the target
 message/channel is treated as idempotent success. The dashboard can also request a drain via
 `POST /v1/queue/drain` and cancel entries that are still `PENDING`.
+
+## Tickets and Join-to-Create
+
+The ticket module uses the `TicketConfig`/`TicketCategory`/`TicketPanel` rows as the authoritative
+panel definition and the `Ticket`/`TicketParticipant` rows as the live case state. A panel button or
+select carries only a namespaced category id; the gateway handler re-checks the module toggle,
+config, blacklist, per-user open limit, category, channel permissions and role hierarchy **before**
+creating a Discord channel. Ticket numbers come from `Guild.ticketCounter` with a unique
+`(guildId, number)` constraint, so concurrent openings cannot collide. Closing a ticket stores a
+size-bounded transcript, writes audit metadata, and deletes/locks the channel; unknown channels are
+treated as idempotent success when a queued close is drained.
+
+Join-to-Create uses `JtcConfig.generatorChannelId` as the trigger. Joining it creates one channel per
+member from `nameTemplate` (`{username}` is replaced with a sanitized display name), applies the
+configured limit/bitrate/region plus trusted-role overwrites, stores a `JtcRoom`, and moves the
+member. A short per-user/per-guard cooldown prevents reconnect loops from creating duplicates. When
+the last member leaves, the channel is deleted and the room is soft-deleted; manual Discord channel
+deletions mark the room as deleted too. Room controls (`lock`, `hide`, `limit`, `rename`, `transfer`,
+`kick`, `ban`, `permit`, `invite`) require ownership or a trusted role and are re-checked against
+Discord at execution time.
+
+Both features hot-reload from the same `nujum_config` notification path as security and verification.
+The dashboard can publish ticket panels through `POST /v1/guilds/:guildId/panels/tickets`; when the
+bot is offline the action is queued as `PUBLISH_TICKET_PANEL` and revalidated on drain.
 
 ## Local development
 

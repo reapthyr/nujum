@@ -11,6 +11,7 @@ import {
   type BotGuildSnapshot,
   type BotMeta,
   type LockdownInput,
+  type PublishTicketPanelInput,
   type PublishVerificationInput,
   type QueueDrainResult,
   type SendMessageInput,
@@ -152,6 +153,18 @@ export class BotApiClient {
     return this.request(
       "POST",
       `/v1/guilds/${guildId}/panels/verification`,
+      botActionResultSchema,
+      input,
+    );
+  }
+
+  publishTicketPanel(
+    guildId: string,
+    input: PublishTicketPanelInput,
+  ): Promise<BotResponse<BotActionResult>> {
+    return this.request(
+      "POST",
+      `/v1/guilds/${guildId}/panels/tickets`,
       botActionResultSchema,
       input,
     );

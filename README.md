@@ -6,15 +6,16 @@ Nujum is a production-grade monorepo with two independently deployable apps that
 PostgreSQL database and one contracts package:
 
 - **`apps/bot`** — discord.js v14 bot + small Fastify API, hosted on an Oracle Cloud VPS in Docker
-  behind Caddy (automatic HTTPS). _(Phase 2 complete)_
-- **`apps/dashboard`** — Next.js 15 admin dashboard on Vercel. _(Phase 4 complete)_
+  behind Caddy (automatic HTTPS). _(Phases 2–3 and 6 complete)_
+- **`apps/dashboard`** — Next.js 15 admin dashboard on Vercel. _(Phases 4–5 complete)_
 - **`packages/shared`** — Prisma schema/client, zod contracts, DTOs, constants, permission
   definitions and the HMAC implementation.
 
-> **Status:** Phases 1–4 are complete: workspace, shared contracts and schema, bot foundation, the
-> security layer, hot-reload config, live Bot API actions with durable queue draining, and the
-> Next.js dashboard with Discord OAuth, server-side authorization, audit/revert and offline queue
-> handling. 186 unit tests pass (82 shared + 90 bot + 14 dashboard).
+> **Status:** Phases 1–6 are complete: workspace, shared contracts and schema, bot foundation, the
+> security layer, hot-reload config, live Bot API actions with durable queue draining, the Next.js
+> dashboard with Discord OAuth, server-side authorization, audit/revert and offline queue handling,
+> plus ticket panels and Join-to-Create rooms. 228 unit tests pass (89 shared + 112 bot + 27
+> dashboard).
 
 ---
 
@@ -100,7 +101,8 @@ nujum/
 ├─ docs/
 │  ├─ database.md             # pooling, migrations, NOTIFY, queue semantics
 │  ├─ bot.md                  # bot architecture, API contract, deployment
-│  └─ security.md             # detectors, verification and escalation
+│  ├─ security.md             # detectors, verification and escalation
+│  └─ tickets.md              # ticket/JTC lifecycle and end-to-end test
 ├─ docker-compose.yml         # bot + Caddy production stack
 ├─ SECURITY.md
 └─ README.md

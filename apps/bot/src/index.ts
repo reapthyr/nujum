@@ -54,6 +54,8 @@ async function main(): Promise<void> {
       client.security.invalidate(guildId);
       client.verification.invalidate(guildId);
       client.modules.invalidate(guildId);
+      client.tickets.invalidate(guildId);
+      client.jtc.invalidate(guildId);
     },
   });
   await loadCommands(client);

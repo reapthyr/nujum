@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   announcementBodySchema,
   lockdownBodySchema,
+  publishTicketPanelBodySchema,
   publishVerificationBodySchema,
   queuedBotActionSchema,
   sendMessageBodySchema,
@@ -139,6 +140,20 @@ export async function publishVerificationPanelAction(
     publishVerificationBodySchema,
     "PUBLISH_VERIFICATION_PANEL",
     (client, payload) => client.publishVerificationPanel(guildId, payload),
+  );
+}
+
+export async function publishTicketPanelAction(
+  guildId: string,
+  input: unknown,
+): Promise<ActionResult<LiveActionOutcome>> {
+  return runLiveAction(
+    guildId,
+    "live.ticket.panel",
+    input,
+    publishTicketPanelBodySchema,
+    "PUBLISH_TICKET_PANEL",
+    (client, payload) => client.publishTicketPanel(guildId, payload),
   );
 }
 

@@ -91,6 +91,51 @@ describe("Bot API client", () => {
     expect(verification.ok).toBe(true);
   });
 
+  it("signs the ticket panel POST path and body byte-for-byte", async () => {
+    let captured: { url: string; init: RequestInit } | undefined;
+    const fetchImpl = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      captured = { url: requestUrl(input), init: init ?? {} };
+      return Promise.resolve(
+        jsonResponse({
+          data: { type: "PUBLISH_TICKET_PANEL", status: "SENT", messageId: "333333333333333333" },
+          requestId: "req-ticket",
+        }),
+      );
+    }) as unknown as typeof fetch;
+
+    const result = await client(fetchImpl).publishTicketPanel("123456789012345678", {
+      channelId: "222222222222222222",
+      preview: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.data?.messageId).toBe("333333333333333333");
+    const url = new URL(captured?.url ?? "");
+    expect(url.pathname).toBe("/v1/guilds/123456789012345678/panels/tickets");
+    const body = (captured?.init.body as string | undefined) ?? "";
+    const headers = captured?.init.headers as Record<string, string>;
+    const verification = verifyRequest({
+      secret: SECRET,
+      headers,
+      method: "POST",
+      path: url.pathname + url.search,
+      body,
+    });
+    expect(verification.ok).toBe(true);
+    expect(JSON.parse(body)).toEqual({ channelId: "222222222222222222", preview: true });
+  });
+
+  it("reports the ticket panel action as safely queueable when the bot is offline", async () => {
+    const fetchImpl = vi.fn(() =>
+      Promise.reject(new Error("ECONNREFUSED")),
+    ) as unknown as typeof fetch;
+    const result = await client(fetchImpl).publishTicketPanel("123456789012345678", {
+      preview: false,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.offline).toBe(true);
+    expect(result.code).toBe("OFFLINE");
+  });
+
   it("returns an offline result when the bot cannot be reached", async () => {
     const fetchImpl = vi.fn(() =>
       Promise.reject(new Error("ECONNREFUSED")),

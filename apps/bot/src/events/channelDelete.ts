@@ -9,6 +9,18 @@ export const event = defineEvent({
   execute: async (client, channel) => {
     if (channel.isDMBased()) return;
     const guild = channel.guild;
+
+    // JTC rooms must be marked deleted even when the bot itself removed the
+    // empty channel, so this runs before the audit-actor early return.
+    try {
+      await client.jtc.markChannelDeleted(guild.id, channel.id);
+    } catch (error) {
+      client.logger.warn(
+        { err: serializeError(error), guildId: guild.id, channelId: channel.id },
+        "channelDelete JTC cleanup failed",
+      );
+    }
+
     try {
       const actorId = await findAuditActor({
         guild,
