@@ -20,6 +20,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  // Prisma's native engine is copied into .next/server after build; file
+  // tracing does not detect the dynamic require, so include it explicitly.
+  outputFileTracingIncludes: {
+    "/*": [".next/server/libquery_engine-*.so.node"],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "128kb",

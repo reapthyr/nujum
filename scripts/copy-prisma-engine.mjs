@@ -8,10 +8,12 @@
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const dashboardRoot = process.cwd();
-const generatedClientDir = path.resolve(dashboardRoot, "../../packages/shared/generated/client");
-const nextServerDir = path.resolve(dashboardRoot, ".next/server");
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(scriptDir, "..");
+const generatedClientDir = path.join(repoRoot, "packages/shared/generated/client");
+const nextServerDir = path.join(repoRoot, "apps/dashboard/.next/server");
 
 if (!existsSync(generatedClientDir)) {
   console.error(`Prisma client not found at ${generatedClientDir}. Run prisma generate first.`);
