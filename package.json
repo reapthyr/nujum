@@ -1,0 +1,33 @@
+{
+  "name": "nujum",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nujum — all-in-one Discord bot plus a separate admin dashboard",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.11",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "pnpm --filter @nujum/shared build",
+    "build:shared": "pnpm --filter @nujum/shared build",
+    "typecheck": "pnpm --filter @nujum/shared typecheck",
+    "test": "pnpm --filter @nujum/shared test",
+    "test:watch": "pnpm --filter @nujum/shared test:watch",
+    "lint": "pnpm --filter @nujum/shared lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @nujum/shared db:generate",
+    "db:migrate": "pnpm --filter @nujum/shared db:migrate",
+    "db:deploy": "pnpm --filter @nujum/shared db:deploy",
+    "db:studio": "pnpm --filter @nujum/shared db:studio",
+    "db:diff": "pnpm --filter @nujum/shared db:diff"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.27.0",
+    "eslint": "^9.27.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.1"
+  }
+}
