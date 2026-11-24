@@ -39,7 +39,12 @@ export default async function GuildLayout({
   let context;
   try {
     context = await requireGuildAccess(guildId);
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `Guild access failed for ${guildId}:`,
+      error instanceof Error ? error.message : error,
+    );
     redirect("/dashboard");
   }
 

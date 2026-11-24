@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { getPrisma } from "@nujum/shared/prisma";
-import type { Session } from "next-auth";
 import { getEnv } from "../env";
 import { SecurityError } from "./http";
 
@@ -154,13 +153,27 @@ export function parseDiscordGuilds(raw: unknown): DiscordGuildSummary[] {
   }));
 }
 
-export async function listDiscordGuilds(session: Session): Promise<DiscordGuildSummary[]> {
-  const token = await discordAccount(session.user.id, session.user.discordId);
-  const response = await fetch("https://discord.com/api/v10/users/@me/guilds?limit=200", {
+async function fetchDiscordGuilds(token: string): Promise<Response> {
+  return fetch("https://discord.com/api/v10/users/@me/guilds?limit=200", {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store",
     signal: AbortSignal.timeout(8_000),
   });
+}
+
+export async function listDiscordGuilds(
+  userId: string,
+  discordId: string,
+): Promise<DiscordGuildSummary[]> {
+  const token = await discordAccount(userId, discordId);
+
+  // Discord rate-limits per token. Layouts and pages can render in parallel, so
+  // retry once on a transient 429/5xx before surfacing a sign-in error.
+  let response = await fetchDiscordGuilds(token);
+  if (response.status === 429 || response.status >= 500) {
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    response = await fetchDiscordGuilds(token);
+  }
   if (!response.ok) {
     throw new SecurityError(
       "Discord guilds could not be loaded. Please sign in again.",

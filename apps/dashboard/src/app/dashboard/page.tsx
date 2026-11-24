@@ -12,7 +12,10 @@ export default async function GuildListPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const guilds = await listManageableGuilds(session).catch((error) => {
+  const guilds = await listManageableGuilds(
+    session.user.id,
+    session.user.discordId,
+  ).catch((error) => {
     // eslint-disable-next-line no-console
     console.error("Failed to list Discord guilds:", error instanceof Error ? error.message : error);
     return [];
