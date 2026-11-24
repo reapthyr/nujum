@@ -5,6 +5,13 @@ import Discord from "next-auth/providers/discord";
 import { getPrisma } from "@nujum/shared/prisma";
 import { getEnv } from "./env";
 
+/** Extra fields carried from the Discord sign-in callback into the adapter. */
+type DiscordAdapterUser = AdapterUser & {
+  discordId?: string;
+  globalName?: string | null;
+  avatar?: string | null;
+};
+
 /**
  * Auth.js v5 with Discord OAuth and database sessions.
  *
@@ -18,13 +25,17 @@ export function createAuthConfig(): NextAuthConfig {
   const baseCreateUser = adapter.createUser?.bind(adapter);
   if (!baseCreateUser) throw new Error("Auth adapter is missing createUser");
   adapter.createUser = async (user: AdapterUser) => {
-    // The Prisma User model requires these fields; the adapter forwards them.
-    const enriched = {
-      ...user,
-      username: user.name ?? "Discord user",
-      discordId: user.id,
+    // Auth.js sends generic `name`/`image` fields, but the Prisma User model
+    // stores Discord-specific columns. Map them here and drop the unknown keys.
+    const { name, image, ...data } = user as DiscordAdapterUser;
+    const mapped = {
+      ...data,
+      username: name ?? "Discord user",
+      globalName: name ?? null,
+      avatar: image ?? null,
+      discordId: data.discordId,
     } as AdapterUser;
-    return baseCreateUser(enriched);
+    return baseCreateUser(mapped);
   };
 
   return {
@@ -80,6 +91,14 @@ export function createAuthConfig(): NextAuthConfig {
           select: { isBlacklisted: true },
         });
         if (existing?.isBlacklisted) return false;
+
+        // Auth.js assigns a random internal id before createUser; the real
+        // Discord id lives on the linked account. Carry it into the adapter
+        // so the User.discordId unique column is populated correctly.
+        const discordUser = user as DiscordAdapterUser;
+        discordUser.discordId = account.providerAccountId;
+        discordUser.globalName = user.name ?? null;
+        discordUser.avatar = user.image ?? null;
         return Boolean(user);
       },
       async session({ session, user }) {
