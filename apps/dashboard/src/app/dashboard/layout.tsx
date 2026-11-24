@@ -5,7 +5,7 @@ import { auth } from "../../auth";
 import { AccountMenu } from "../../components/account-menu";
 import { Badge } from "../../components/ui/badge";
 import { getEnv } from "../../env";
-import { isSuperAdmin, listDiscordGuilds } from "../../lib/authz";
+import { isSuperAdmin, listManageableGuilds } from "../../lib/authz";
 
 export const metadata = { title: "Dashboard" };
 
@@ -13,7 +13,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const session = await auth();
   if (!session?.user?.id || session.user.isBlacklisted) redirect("/login");
 
-  const guilds = await listDiscordGuilds(session).catch((error) => {
+  const guilds = await listManageableGuilds(session).catch((error) => {
     // eslint-disable-next-line no-console
     console.error("Failed to list Discord guilds:", error instanceof Error ? error.message : error);
     return [];
@@ -40,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <nav className="mt-3 flex-1 space-y-1 overflow-y-auto pr-1">
           {guilds.length === 0 ? (
             <p className="rounded-xl border border-dashed p-3 text-xs text-muted">
-              No manageable servers found. Check the Discord <code>guilds</code> scope.
+              No servers with Nujum installed that you can manage.
             </p>
           ) : null}
           {guilds.map((guild) => (

@@ -47,6 +47,24 @@ export function isSuperAdmin(discordId: string, ownerIds: readonly string[]): bo
   return ownerIds.includes(discordId);
 }
 
+/**
+ * A server is only usable when Nujum is installed there and the signed-in user
+ * can manage it. Super admins still only see servers the bot is in.
+ */
+export function filterManageableGuilds(
+  guilds: readonly DiscordGuildSummary[],
+  botGuildIds: ReadonlySet<string>,
+  discordId: string,
+  ownerIds: readonly string[],
+): DiscordGuildSummary[] {
+  const superAdmin = isSuperAdmin(discordId, ownerIds);
+  return guilds.filter(
+    (guild) =>
+      botGuildIds.has(guild.id) &&
+      (superAdmin || canManageGuild(parsePermissionBits(guild.permissions), guild.owner)),
+  );
+}
+
 export function assertGuildAccess(
   guild: DiscordGuildSummary,
   discordId: string,

@@ -39,3 +39,25 @@ export async function markGuildLeft(guildId: string, logger: BotLogger): Promise
     logger.error({ err: serializeError(error), guildId }, "failed to mark guild as left");
   }
 }
+
+/**
+ * Reconciles the database after a restart: any guild the bot is no longer in is
+ * marked as left so the dashboard never offers it.
+ */
+export async function markMissingGuildsLeft(
+  activeGuildIds: Iterable<string>,
+  logger: BotLogger,
+): Promise<void> {
+  const ids = [...activeGuildIds];
+  try {
+    await getPrisma().guild.updateMany({
+      where: {
+        leftAt: null,
+        ...(ids.length > 0 ? { id: { notIn: ids } } : {}),
+      },
+      data: { leftAt: new Date() },
+    });
+  } catch (error) {
+    logger.error({ err: serializeError(error) }, "failed to reconcile guild membership");
+  }
+}

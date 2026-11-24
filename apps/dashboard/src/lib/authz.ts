@@ -4,6 +4,7 @@ import { auth } from "../auth";
 import { getEnv } from "../env";
 import {
   assertGuildAccess,
+  filterManageableGuilds,
   guildIdSchema,
   listDiscordGuilds,
   type DiscordGuildSummary,
@@ -35,20 +36,38 @@ export async function requireSession(): Promise<Session> {
   return session;
 }
 
+/** Discord guilds where the signed-in user has management access and Nujum is installed. */
+export async function listManageableGuilds(session: Session): Promise<DiscordGuildSummary[]> {
+  const [guilds, activeGuilds] = await Promise.all([
+    listDiscordGuilds(session),
+    getPrisma().guild.findMany({
+      where: { leftAt: null },
+      select: { id: true },
+    }),
+  ]);
+  const botGuildIds = new Set(activeGuilds.map((guild) => guild.id));
+  return filterManageableGuilds(
+    guilds,
+    botGuildIds,
+    session.user.discordId,
+    getEnv().DASHBOARD_OWNER_IDS,
+  );
+}
+
 /** The single authorization gate used by every guild page and server action. */
 export async function requireGuildAccess(rawGuildId: string): Promise<GuildContext> {
   const parsedId = guildIdSchema.safeParse(rawGuildId);
   if (!parsedId.success) throw new SecurityError("Invalid server id.", "FORBIDDEN");
   const session = await requireSession();
-  const guilds = await listDiscordGuilds(session);
+  const guilds = await listManageableGuilds(session);
   const guild = guilds.find((entry) => entry.id === parsedId.data);
-  if (!guild) throw new SecurityError("You are not a member of that server.", "FORBIDDEN");
+  if (!guild) {
+    throw new SecurityError(
+      "That server is not connected to Nujum, or you do not have permission to manage it.",
+      "FORBIDDEN",
+    );
+  }
 
   const role = assertGuildAccess(guild, session.user.discordId, getEnv().DASHBOARD_OWNER_IDS);
-  await getPrisma().guild.upsert({
-    where: { id: guild.id },
-    create: { id: guild.id, name: guild.name, iconHash: guild.icon, ownerId: guild.ownerId },
-    update: { name: guild.name, iconHash: guild.icon, ownerId: guild.ownerId, leftAt: null },
-  });
   return { session, guild, role };
 }

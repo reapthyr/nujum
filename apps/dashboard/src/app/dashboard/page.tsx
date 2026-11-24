@@ -4,13 +4,7 @@ import { ArrowUpRight, Server } from "lucide-react";
 import { auth } from "../../auth";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import {
-  canManageGuild,
-  isSuperAdmin,
-  listDiscordGuilds,
-  parsePermissionBits,
-} from "../../lib/authz";
-import { getEnv } from "../../env";
+import { listManageableGuilds } from "../../lib/authz";
 
 export const metadata = { title: "Servers" };
 
@@ -18,17 +12,11 @@ export default async function GuildListPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const guilds = await listDiscordGuilds(session).catch((error) => {
+  const guilds = await listManageableGuilds(session).catch((error) => {
     // eslint-disable-next-line no-console
     console.error("Failed to list Discord guilds:", error instanceof Error ? error.message : error);
     return [];
   });
-  const ownerIds = getEnv().DASHBOARD_OWNER_IDS;
-  const manageable = guilds.filter(
-    (guild) =>
-      isSuperAdmin(session.user.discordId, ownerIds) ||
-      canManageGuild(parsePermissionBits(guild.permissions), guild.owner),
-  );
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
@@ -40,11 +28,11 @@ export default async function GuildListPage() {
             Choose a server to configure security, verification and live operations.
           </p>
         </div>
-        <Badge tone="neutral">{manageable.length} manageable</Badge>
+        <Badge tone="neutral">{guilds.length} manageable</Badge>
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        {manageable.map((guild) => (
+        {guilds.map((guild) => (
           <Link key={guild.id} href={`/dashboard/${guild.id}`} className="group">
             <Card className="h-full transition group-hover:border-primary/40 group-hover:bg-surface">
               <CardHeader>
@@ -72,11 +60,11 @@ export default async function GuildListPage() {
         ))}
       </div>
 
-      {manageable.length === 0 ? (
+      {guilds.length === 0 ? (
         <Card className="mt-8 text-center">
           <p className="text-sm text-muted">
-            No servers with owner or Manage Server permissions were found. Ask a server owner to
-            grant access, or check that the Discord OAuth <code>guilds</code> scope is approved.
+            No servers with Nujum installed that you can manage were found. Invite the bot to a
+            server where you have the <strong>Manage Server</strong> permission.
           </p>
         </Card>
       ) : null}

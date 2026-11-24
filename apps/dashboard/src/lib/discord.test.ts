@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertGuildAccess,
   canManageGuild,
+  filterManageableGuilds,
   isSuperAdmin,
   parseDiscordGuilds,
   parsePermissionBits,
@@ -59,5 +60,40 @@ describe("Discord authorization", () => {
         permissions: "8",
       },
     ]);
+  });
+
+  it("only returns manageable servers where the bot is installed", () => {
+    const botGuild: DiscordGuildSummary = {
+      ...guild,
+      id: "123456789012345678",
+      owner: false,
+      permissions: "8",
+    };
+    const botGuildNoAccess: DiscordGuildSummary = {
+      ...guild,
+      id: "223456789012345678",
+      owner: false,
+      permissions: "0",
+    };
+    const notInstalled: DiscordGuildSummary = {
+      ...guild,
+      id: "323456789012345678",
+      owner: true,
+    };
+    const allGuilds = [botGuild, botGuildNoAccess, notInstalled];
+    const botGuildIds = new Set([botGuild.id, botGuildNoAccess.id]);
+
+    expect(
+      filterManageableGuilds(allGuilds, botGuildIds, "111111111111111111", []).map(
+        (entry) => entry.id,
+      ),
+    ).toEqual([botGuild.id]);
+
+    // Super admins are still limited to servers where Nujum is installed.
+    expect(
+      filterManageableGuilds(allGuilds, botGuildIds, "111111111111111111", [
+        "111111111111111111",
+      ]).map((entry) => entry.id),
+    ).toEqual([botGuild.id, botGuildNoAccess.id]);
   });
 });

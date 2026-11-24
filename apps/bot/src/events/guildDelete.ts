@@ -1,8 +1,10 @@
+import { markGuildLeft } from "../lib/guilds";
 import { defineEvent } from "./types";
 
 export const event = defineEvent({
   name: "guildDelete",
-  execute: (client, guild) => {
+  execute: async (client, guild) => {
+    await markGuildLeft(guild.id, client.logger);
     client.logger.info(
       {
         guildId: guild.id,
