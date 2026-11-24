@@ -33,6 +33,9 @@ export function createAuthConfig(): NextAuthConfig {
       Discord({
         clientId: env.AUTH_DISCORD_ID,
         clientSecret: env.AUTH_DISCORD_SECRET,
+        // Discord now sends RFC 9207 `iss`; Auth.js's built-in provider has no
+        // issuer and would reject it against its https://authjs.dev placeholder.
+        issuer: "https://discord.com",
         authorization: { params: { scope: "identify guilds" } },
       }),
     ],

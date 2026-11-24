@@ -2,8 +2,9 @@
 // Run `pnpm db:migrate` with DIRECT_URL for migrations; runtime uses the pooled URL.
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/client"
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
