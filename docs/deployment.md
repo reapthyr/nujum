@@ -85,46 +85,79 @@ CI runs the same gates (`.github/workflows/ci.yml`). Do not deploy a commit that
 
 ---
 
-## 3. VPS (bot + Caddy)
+## 3. VPS (bot, direct Node.js)
 
-Tested shape: Ubuntu 24.04 on Oracle Cloud (Ampere arm64 or AMD x86_64). The Dockerfile is
-architecture-neutral; for multi-arch registry pushes use
-`docker buildx build --platform linux/amd64,linux/arm64 -f apps/bot/Dockerfile .`.
+Tested shape: Ubuntu 22.04 on Oracle Cloud (2 cores, ~1 GB RAM). No Docker is required — the bot runs
+as a plain Node process under `systemd`.
 
 1. Harden SSH: key-only login, disable password auth, disable root login, enable `ufw` and
    `unattended-upgrades`/`fail2ban`.
-2. In **both** the Oracle VCN security list and `ufw`, allow inbound TCP 80 and 443 (and UDP 443 for
-   HTTP/3); keep 22 restricted to your IP. **Never publish 8080.**
-3. Install Docker Engine + Compose plugin from Docker's official apt repository.
+2. In **both** the Oracle VCN security list and `ufw`, allow inbound TCP `8080` from `0.0.0.0/0` (the
+   dashboard calls `BOT_API_URL` over the public internet). Keep 22 restricted to your IP.
+   Requests are authenticated with `BOT_API_HMAC_SECRET`; do not expose other ports.
+3. Install Node 22 and pnpm:
+
+   ```bash
+   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+   sudo apt-get install -y nodejs git curl
+   sudo npm install -g pnpm@12.23.0
+   ```
+
 4. Clone the repo and prepare env files:
 
    ```bash
-   git clone <repo> /opt/nujum && cd /opt/nujum
-   cp .env.compose.example .env.compose
+   sudo git clone https://github.com/reapthyr/nujum.git /opt/nujum
+   sudo chown -R "$USER:$USER" /opt/nujum
+   cd /opt/nujum
    cp apps/bot/.env.example apps/bot/.env
+   cp packages/shared/.env.example packages/shared/.env
    # fill in: token, client id, DATABASE_URL (pooled), DIRECT_URL (direct),
    # BOT_API_HMAC_SECRET (openssl rand -hex 32), OWNER_IDS
-   chmod 600 .env.compose apps/bot/.env
+   chmod 600 apps/bot/.env packages/shared/.env
    ```
 
-5. Point `BOT_API_DOMAIN` (in `.env.compose`) at a DNS A/AAAA record for the VPS, set `ACME_EMAIL`,
-   then start the stack:
+5. Install, build, and run. On small VPS instances TypeScript compilation can exceed Node's default
+   heap, so raise it explicitly:
 
    ```bash
-   docker compose --env-file .env.compose up -d --build
-   docker compose ps                       # both services healthy/up
-   docker compose logs -f bot              # gateway ready; no secret values in logs
+   cd /opt/nujum
+   export NODE_OPTIONS="--max-old-space-size=1024"
+   pnpm install --frozen-lockfile
+   pnpm --filter @nujum/shared build
+   pnpm --filter @nujum/bot build
    ```
 
-   Caddy obtains a Let's Encrypt certificate on first request; port 80 must be reachable. The bot
-   binds `0.0.0.0` only inside the Compose network and sets `BOT_API_TRUST_PROXY=true` because Caddy
-   is its only peer.
-
-6. Register slash commands once after deployment:
+6. Create a `systemd` service so the bot restarts automatically:
 
    ```bash
-   # from a machine with the bot env loaded, or inside a one-off container
-   pnpm --filter @nujum/bot deploy:commands
+   sudo tee /etc/systemd/system/nujum-bot.service >/dev/null <<EOF
+   [Unit]
+   Description=Nujum Discord Bot
+   After=network-online.target
+   Wants=network-online.target
+
+   [Service]
+   Type=simple
+   User=$USER
+   WorkingDirectory=/opt/nujum/apps/bot
+   ExecStart=$(command -v node) dist/index.js
+   Restart=always
+   RestartSec=5
+   Environment=NODE_ENV=production
+
+   [Install]
+   WantedBy=multi-user.target
+   EOF
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now nujum-bot
+   ```
+
+   Set `BOT_API_URL` in Vercel to `http://<VPS_PUBLIC_IP>:8080` and redeploy.
+
+7. Register slash commands once after deployment:
+
+   ```bash
+   cd /opt/nujum && pnpm --filter @nujum/bot deploy:commands
    ```
 
    Use `DEV_GUILD_ID` for instant registration in a test guild; omit it for global commands.
@@ -132,9 +165,10 @@ architecture-neutral; for multi-arch registry pushes use
 Useful probes:
 
 ```bash
-curl -fsS https://api.example.com/healthz               # liveness, 200 while process is alive
-curl -fsS https://api.example.com/readyz                # 200 only with DB + gateway ready
-docker inspect --format '{{json .State.Health}}' nujum-bot-1
+curl -fsS http://127.0.0.1:8080/healthz               # liveness, 200 while process is alive
+curl -fsS http://127.0.0.1:8080/readyz                # 200 only with DB + gateway ready
+sudo systemctl status nujum-bot --no-pager
+sudo journalctl -u nujum-bot -f
 ```
 
 ---
