@@ -200,6 +200,8 @@ lightweight `SELECT 1`, so credentials or network problems are caught before com
 
 ## Docker deployment (Oracle Cloud VPS)
 
+See [deployment.md](deployment.md) for the full VPS/Vercel runbook, smoke test and rollback steps.
+
 ```bash
 cp .env.compose.example .env.compose       # BOT_API_DOMAIN + ACME_EMAIL
 cp apps/bot/.env.example apps/bot/.env     # real secrets
@@ -237,7 +239,7 @@ Oracle Cloud: allow inbound TCP 80/443 in the VCN security list **and** the inst
 - `/readyz` returning 503 means the database or gateway is down; `/healthz` stays 200 while the
   process is alive (useful for liveness probes that should not flap on a Discord outage).
 
-## Tests (90 bot tests + 82 shared tests)
+## Tests (112 bot tests + 89 shared tests)
 
 | File                      | Covers                                                                                                                        |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -249,7 +251,10 @@ Oracle Cloud: allow inbound TCP 80/443 in the VCN security list **and** the inst
 | `lib/permissions.test.ts` | full shared→discord.js permission mapping, no missing flags.                                                                  |
 | `commands.test.ts`        | manifest parity with the shared registry, valid Discord JSON, invite URL never requests Administrator.                        |
 | `api/server.test.ts`      | health/readiness, unsigned/replayed/wrong-path requests, malformed JSON, 404, IP allowlist, all live routes and actor checks. |
+| `api/queue.test.ts`       | queued payload revalidation, drain cases and idempotent handling.                                                             |
 | `config/watcher.test.ts`  | version comparison, stale notifications, poll fallback, DB failure isolation.                                                 |
+| `tickets/tickets.test.ts` | ticket config cache/degradation, naming format, byte-accurate transcript escaping.                                            |
+| `jtc/jtc.test.ts`         | JTC name sanitization, validation and preset/room guards.                                                                     |
 
 Run everything:
 

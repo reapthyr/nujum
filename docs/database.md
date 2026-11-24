@@ -56,8 +56,8 @@ pnpm db:studio      # browse data
 
 Rules:
 
-- **Never** run `prisma migrate` from the Vercel runtime. Use CI (`.github/workflows/db-migrate.yml`,
-  added in Phase 14) or run it manually against `DIRECT_URL`.
+- **Never** run `prisma migrate` from the Vercel runtime. Use CI
+  (`.github/workflows/db-migrate.yml`) or run it manually against `DIRECT_URL`.
 - Schema changes are reviewed as SQL in the migration file, not only as a Prisma diff.
 - Migrations are forward-only; destructive changes require an explicit backup step.
 - The Prisma client is generated into `packages/shared/generated/client` and is git-ignored;
@@ -173,6 +173,7 @@ cascade.
 ## 7. Backups
 
 - Neon: enable point-in-time restore (default 7 days, extend on paid plans).
-- Weekly logical dump via `scripts/backup-db.sh` (Phase 14) using `pg_dump --format=custom`.
+- Weekly logical dump via `scripts/backup-db.sh` using `pg_dump --format=custom`
+  (see [deployment.md §8](deployment.md#8-backup-and-restore)).
 - Per-guild config backups are also stored in `Backup` and exportable from the dashboard.
 - Restore drills are part of the Phase 14 security checklist.

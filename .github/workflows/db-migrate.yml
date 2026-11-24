@@ -1,0 +1,35 @@
+name: Database migrations
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "packages/shared/prisma/**"
+
+permissions:
+  contents: read
+
+# Never run two migrations against the same database at once.
+concurrency:
+  group: db-migrate-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:shared
+      # Forward-only, idempotent: prisma migrate deploy skips already-applied rows.
+      - run: pnpm db:deploy

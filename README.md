@@ -99,8 +99,9 @@ nujum/
 ├─ docker/
 │  └─ Caddyfile               # automatic HTTPS reverse proxy for the Bot API
 ├─ docs/
+│  ├─ bot.md                  # bot architecture and API contract
 │  ├─ database.md             # pooling, migrations, NOTIFY, queue semantics
-│  ├─ bot.md                  # bot architecture, API contract, deployment
+│  ├─ deployment.md           # VPS/Vercel runbook, smoke test, backup, rollback
 │  ├─ security.md             # detectors, verification and escalation
 │  └─ tickets.md              # ticket/JTC lifecycle and end-to-end test
 ├─ docker-compose.yml         # bot + Caddy production stack
@@ -187,7 +188,8 @@ deployables. Each app has its own example file:
   limits.
 
 Docker deployments add `.env.compose` (see `.env.compose.example`) for the public hostname and ACME
-email.
+email. See [docs/deployment.md](docs/deployment.md) for the full VPS/Vercel runbook, automated smoke
+test, secret rotation and rollback.
 
 ---
 
@@ -263,8 +265,10 @@ See [SECURITY.md](SECURITY.md) for the full model and phase-by-phase controls.
 | 3     | Bot security layer: permissions, hierarchy, anti-raid/nuke/spam | ✅ complete |
 | 4     | Config hot-reload, Bot API live actions/queue, dashboard client | ✅ complete |
 | 5     | Dashboard auth, layout, landing                                 | ✅ complete |
-| 6–13  | Tickets, JTC, help, moderation, logging, welcome, pages, extras |             |
-| 14    | Deployment docs, CI/CD, Playwright E2E                          |             |
+| 6     | Tickets and Join-to-Create with audited dashboard controls      | ✅ complete |
+| 7–13  | Help, moderation, logging, welcome, pages, extras               |             |
+| 14    | Deployment runbook, CI + migration workflows, smoke test        | ✅ complete |
+| 14    | Playwright browser E2E                                          | 🚧 pending  |
 
 ---
 

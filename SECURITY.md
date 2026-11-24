@@ -91,7 +91,7 @@ cooldowns/rate limits, loader safety, permission mapping, command-manifest parit
 - Namespaced component IDs with guild/user binding and permission re-checks.
 - Cached, zod-validated configuration with safe defaults when PostgreSQL is unavailable; every
   change written to `AuditLog`, every threat to `ThreatEvent`.
-- 82 bot tests cover detectors, configuration caching/failover, thresholds, exemptions, code
+- The bot test suite covers detectors, configuration caching/failover, thresholds, exemptions, code
   hashing, alert throttling, lockdown restore/retry and command-manifest parity. See
   [docs/security.md](docs/security.md).
 
@@ -126,14 +126,37 @@ cooldowns/rate limits, loader safety, permission mapping, command-manifest parit
 - Full audit log with before/after diff, actor metadata and one-transaction revert for config changes;
   errors returned to the browser are generic and never contain stack traces or database details.
 
-### Phase 14 — operations
+### Phase 6 — tickets and Join-to-Create (implemented)
 
-- SSH keys only, password login disabled, non-root user, `ufw`, `fail2ban`,
-  `unattended-upgrades`.
-- Ports opened in both the Oracle security list and the OS firewall.
-- Caddy automatic HTTPS; bot API bound to localhost/Compose network only.
-- Secrets in Vercel/GitHub Actions/Oracle vaults; never committed.
-- Log rotation, healthchecks, uptime monitoring, restore drills.
+- Ticket creation re-checks module/config state, opener blacklist, per-user open limit, channel
+  permissions and member hierarchy; channel overwrites hide the channel from `@everyone` and grant
+  only the opener and staff the required flags.
+- Panel publishes are guild-bound and permission-checked even though component customIds are not
+  user-owned; user-owned actions remain bound to the interacting member. Mentions stay neutralized.
+- Transcripts escape all message content and enforce the byte budget with UTF-8-aware truncation, so
+  multibyte text cannot bypass the size cap.
+- JTC room names are sanitized (mentions, markdown control characters and line breaks removed), room
+  creation is guarded by a reconnect cooldown, and rooms are soft-deleted on last-member leave or
+  channel deletion. Preset default switching is transactional.
+- Every ticket/JTC config write is audited with before/after images, bumps `configVersion` and emits
+  `pg_notify` in the same transaction; reverts use the same path. Offline live actions persist only
+  zod-validated data, never code, and are revalidated on drain.
+- 228 unit tests pass (89 shared + 112 bot + 27 dashboard).
+
+### Phase 14 — operations (runbook and CI implemented; host hardening is operator-owned)
+
+- `docs/deployment.md`: VPS/Vercel runbook, automated HMAC smoke test, secret rotation, backup,
+  restore and rollback procedures.
+- `.github/workflows/ci.yml`: install, shared build, typecheck, lint, tests, format and production
+  build with dummy env only.
+- `.github/workflows/db-migrate.yml`: environment-scoped secrets, serialized `prisma migrate deploy`
+  on Prisma changes; migrations never run from Vercel runtime.
+- `scripts/backup-db.sh`: direct-URL `pg_dump` with 14-day retention and no secret leakage.
+- Operator tasks: SSH keys only, password login disabled, non-root user, `ufw`, `fail2ban`,
+  `unattended-upgrades`; ports opened in both the Oracle security list and the OS firewall; Caddy
+  automatic HTTPS with the bot API bound to the Compose network only; secrets stored in
+  Vercel/GitHub environments; log rotation, healthchecks, uptime monitoring and quarterly restore
+  drills.
 
 ---
 
@@ -143,9 +166,9 @@ cooldowns/rate limits, loader safety, permission mapping, command-manifest parit
 - [x] Startup validation rejects missing/weak secrets.
 - [x] HMAC secret ≥ 32 chars; rotation supported.
 - [x] Build fails on `NEXT_PUBLIC_*TOKEN|SECRET|DATABASE_URL|...`.
-- [ ] Dashboard → bot requests signed and replay-protected (Phase 4).
-- [ ] Database credentials restricted to pooled/direct roles (Phase 14).
-- [ ] GitHub Actions uses environment-scoped secrets (Phase 14).
+- [x] Dashboard → bot requests signed and replay-protected (Phase 4).
+- [ ] Database credentials restricted to pooled/direct roles (operator: see `docs/deployment.md`).
+- [x] GitHub Actions uses environment-scoped secrets (`db-migrate.yml`).
 - [x] Logs redact tokens, HMAC headers and connection strings (Phase 2).
 
 ---

@@ -15,6 +15,7 @@ packages/shared/generated/
 coverage/
 playwright-report/
 test-results/
+backups/
 
 # env & secrets
 .env

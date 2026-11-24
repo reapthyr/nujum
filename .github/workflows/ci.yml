@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Dummy values only. Real secrets are never needed to build or test.
+env:
+  DATABASE_URL: postgresql://nujum:nujum@localhost:5432/nujum?schema=public
+  DIRECT_URL: postgresql://nujum:nujum@localhost:5432/nujum?schema=public
+  AUTH_SECRET: ci-only-auth-secret-0123456789abcdefghijklmnop
+  AUTH_DISCORD_ID: "123456789012345678"
+  AUTH_DISCORD_SECRET: ci-only-discord-secret
+  BOT_API_URL: http://localhost:4000
+  BOT_API_HMAC_SECRET: ci-only-hmac-secret-0123456789abcdef
+  NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:shared
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm format:check
+      - run: pnpm build
