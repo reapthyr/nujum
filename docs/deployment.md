@@ -56,9 +56,11 @@ CI runs the same gates (`.github/workflows/ci.yml`). Do not deploy a commit that
    are in [database.md §1](database.md#1-provisioning-neon).
 2. Use the **pooled** URL for `DATABASE_URL` (`?pgbouncer=true&connection_limit=1`) and the
    **direct** URL for `DIRECT_URL`. Supabase transaction poolers use `aws-1-<REGION>.pooler.supabase.com`
-   on port `6543` with user `postgres.<PROJECT_REF>`. URL-encode special characters in the password
-   (e.g. `@` becomes `%40`). If the direct host is IPv6-only and the VPS has no IPv6 route, point the
-   bot's `DIRECT_URL` at the pooler too — `LISTEN/NOTIFY` will fall back to the 10-second poll.
+   on port `6543` with user `postgres.<PROJECT_REF>`; the **session** pooler uses the same host on
+   port `5432` and is the right choice for migrations and `LISTEN/NOTIFY`. URL-encode special
+   characters in the password (e.g. `@` becomes `%40`). If the direct host is IPv6-only and the VPS
+   has no IPv6 route, use the session pooler for `DIRECT_URL`. Add `uselibpqcompat=true` to that URL
+   so `node-postgres` does not treat `sslmode=require` as full certificate verification.
 3. Apply migrations from a trusted machine or CI — never from the Vercel runtime.
    Run them from the VPS if the local machine cannot reach the database:
 

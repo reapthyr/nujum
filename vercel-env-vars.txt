@@ -3,7 +3,7 @@ Set these in Vercel: Project -> Settings -> Environment Variables -> Production
 (Use `vercel deploy --prod` if the variables are Production-only.)
 
 DATABASE_URL    = postgresql://postgres.<PROJECT_REF>:<PASSWORD_URL_ENCODED>@aws-1-<REGION>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
-DIRECT_URL      = postgresql://postgres:<PASSWORD_URL_ENCODED>@db.<PROJECT_REF>.supabase.co:5432/postgres?sslmode=require
+DIRECT_URL      = postgresql://postgres.<PROJECT_REF>:<PASSWORD_URL_ENCODED>@aws-1-<REGION>.pooler.supabase.com:5432/postgres?sslmode=require&uselibpqcompat=true
 AUTH_SECRET     = base64 string (openssl rand -base64 48)
 AUTH_DISCORD_ID = Discord application ID
 AUTH_DISCORD_SECRET = Discord OAuth client secret
